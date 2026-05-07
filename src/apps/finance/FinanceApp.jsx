@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns'
@@ -18,7 +18,9 @@ function useFinanceData() {
   const [members, setMembers]       = useState([])
   const [loading, setLoading]       = useState(true)
 
-  // קריאה אחת מהירה — קבוצה + נתונים במקביל
+  // ref מתעדכן מיידית — פותר את בעיית ה-stale closure
+  const groupRef = useRef(null)
+
   const fetchAll = useCallback(async () => {
     if (!user) return
     const { data: groupsData } = await supabase
@@ -30,12 +32,15 @@ function useFinanceData() {
 
     const firstGroup = groupsData[0]
     setGroups(groupsData)
-    setGroup(g => g || firstGroup)
+    // עדכן גם את ה-ref מיידית
+    if (!groupRef.current) groupRef.current = firstGroup
+    setGroup(g => { if (!g) groupRef.current = firstGroup; return g || firstGroup })
 
+    const gid = groupRef.current?.id || firstGroup.id
     const [cats, recs, mems] = await Promise.all([
-      supabase.from('fin_categories').select('*').eq('group_id', firstGroup.id).order('name'),
-      supabase.from('fin_records').select('*, fin_categories(name,color,icon)').eq('group_id', firstGroup.id).order('date', { ascending: false }),
-      supabase.from('fin_group_members').select('*, users:user_id(email)').eq('group_id', firstGroup.id),
+      supabase.from('fin_categories').select('*').eq('group_id', gid).order('name'),
+      supabase.from('fin_records').select('*, fin_categories(name,color,icon)').eq('group_id', gid).order('date', { ascending: false }),
+      supabase.from('fin_group_members').select('*, users:user_id(email)').eq('group_id', gid),
     ])
     setCategories(cats.data || [])
     setRecords(recs.data || [])
@@ -45,8 +50,19 @@ function useFinanceData() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
+  // עדכן ref כשהקבוצה הפעילה משתנה (כשמחליפים מאגר)
+  const setGroupSynced = useCallback((g) => {
+    groupRef.current = g
+    setGroup(g)
+  }, [])
+
+  // פונקציות שמשתמשות ב-ref במקום ב-state (פותר stale closure)
+  const getGroupId = () => groupRef.current?.id
+
   const addCategory = async (d) => {
-    const { data, error } = await supabase.from('fin_categories').insert({ ...d, group_id: group.id }).select().single()
+    const gid = getGroupId()
+    if (!gid) return { error: new Error('לא נמצאה קבוצה פעילה') }
+    const { data, error } = await supabase.from('fin_categories').insert({ ...d, group_id: gid }).select().single()
     if (!error) setCategories(p => [...p, data])
     return { error }
   }
@@ -56,7 +72,9 @@ function useFinanceData() {
     return { error }
   }
   const addRecord = async (d) => {
-    const { data, error } = await supabase.from('fin_records').insert({ ...d, group_id: group.id, created_by: user.id }).select('*, fin_categories(name,color,icon)').single()
+    const gid = getGroupId()
+    if (!gid) return { error: new Error('לא נמצאה קבוצה פעילה') }
+    const { data, error } = await supabase.from('fin_records').insert({ ...d, group_id: gid, created_by: user.id }).select('*, fin_categories(name,color,icon)').single()
     if (!error) setRecords(p => [data, ...p])
     return { error }
   }
@@ -71,8 +89,10 @@ function useFinanceData() {
     return { error }
   }
   const inviteMember = async (email) => {
+    const gid = getGroupId()
+    if (!gid) return { error: new Error('לא נמצאה קבוצה') }
     const { data, error } = await supabase.from('fin_share_invites').insert({
-      group_id: group.id, invited_email: email, invited_by: user.id
+      group_id: gid, invited_email: email, invited_by: user.id
     }).select().single()
     return { data, error }
   }
@@ -82,11 +102,11 @@ function useFinanceData() {
     const { error: me } = await supabase.from('fin_group_members').insert({ group_id: inv.group_id, user_id: user.id, role: 'member' })
     if (me) return { error: me }
     await supabase.from('fin_share_invites').update({ status: 'accepted' }).eq('id', inv.id)
-    await fetchGroups()
+    await fetchAll()
     return { data: inv }
   }
 
-  return { group, groups, setGroup, categories, records, members, loading,
+  return { group, groups, setGroup: setGroupSynced, categories, records, members, loading,
     addCategory, deleteCategory, addRecord, updateRecord, deleteRecord, inviteMember, acceptInvite }
 }
 
