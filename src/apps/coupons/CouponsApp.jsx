@@ -383,9 +383,6 @@ function CouponCard({ coupon, brandColor, onRedeem, onRestore, onEdit, onDelete,
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-            {coupon.is_favorite && (
-              <span style={{ fontSize:14, color:'#f59e0b' }} title="מועדף">★</span>
-            )}
             <h3 style={{ fontWeight:800, fontSize:16, margin:0 }}>{coupon.name}</h3>
             {isExpired && <span className="badge" style={{ background:'rgba(220,38,38,0.1)', color:'var(--red)', fontSize:10 }}>פג תוקף</span>}
             {coupon.redeemed && <span className="badge" style={{ background:'rgba(5,150,105,0.1)', color:'var(--green)', fontSize:10 }}>מומש</span>}
@@ -395,16 +392,6 @@ function CouponCard({ coupon, brandColor, onRedeem, onRestore, onEdit, onDelete,
           )}
         </div>
         <div style={{ display:'flex', gap:2, flexShrink:0, marginRight:6 }}>
-          <button
-            onClick={() => onFavorite?.(coupon.id, coupon.is_favorite)}
-            title={coupon.is_favorite ? 'הסר ממועדפים' : 'הוסף למועדפים'}
-            style={{ background:'none', border:'none', cursor:'pointer', fontSize:17, padding:4,
-              color: coupon.is_favorite ? '#f59e0b' : 'var(--text-muted)',
-              transition:'transform 0.15s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform='scale(1.2)'}
-            onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}
-          >{coupon.is_favorite ? '★' : '☆'}</button>
           {!coupon.redeemed && <button onClick={() => onEdit(coupon)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4,color:'var(--text-muted)' }}>✏️</button>}
           <button onClick={() => onDelete(coupon.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4,color:'var(--text-muted)' }}>🗑️</button>
         </div>
@@ -543,99 +530,129 @@ function groupByBrand(coupons) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Grouped Accordion — קטגוריות עם קפל/פתח
+// Grouped Accordion — קטגוריות עם קפל/פתח + מועדף
 // ─────────────────────────────────────────────────────────────
-function GroupedCoupons({ groups, onRedeem, onRestore, onEdit, onDelete, onExpand, onFavorite }) {
-  // כל הקטגוריות סגורות בהתחלה — רק הראשונה פתוחה
+function GroupedCoupons({ groups, onRedeem, onRestore, onEdit, onDelete, onExpand }) {
   const [openGroups, setOpenGroups] = useState(() => {
     const init = {}
     if (groups.length > 0) init[groups[0].label] = true
     return init
   })
 
-  const toggle = (label) => {
-    setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }))
+  // מועדפי קטגוריות — נשמרים ב-localStorage
+  const [favGroups, setFavGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('coupon_fav_groups') || '{}') }
+    catch { return {} }
+  })
+
+  const toggleFavGroup = (label, e) => {
+    e.stopPropagation()
+    setFavGroups(prev => {
+      const next = { ...prev, [label]: !prev[label] }
+      localStorage.setItem('coupon_fav_groups', JSON.stringify(next))
+      return next
+    })
   }
 
-  const expandAll = () => {
-    const all = {}
-    groups.forEach(g => { all[g.label] = true })
-    setOpenGroups(all)
-  }
-
+  const toggle = (label) => setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }))
+  const expandAll = () => { const a = {}; groups.forEach(g => { a[g.label] = true }); setOpenGroups(a) }
   const collapseAll = () => setOpenGroups({})
-
   const anyOpen = groups.some(g => openGroups[g.label])
+
+  // מיון: מועדפות ראשון, אחר כך לפי גודל
+  const sorted = [...groups].sort((a, b) => {
+    const af = favGroups[a.label] ? 1 : 0
+    const bf = favGroups[b.label] ? 1 : 0
+    if (bf !== af) return bf - af
+    return b.items.length - a.items.length
+  })
 
   return (
     <div>
-      {/* כפתורי פתח/סגור הכל */}
-      <div style={{ display:'flex', gap:8, marginBottom:14, justifyContent:'flex-end' }}>
+      <div style={{ display:"flex", gap:8, marginBottom:14, justifyContent:"flex-end" }}>
         <button onClick={anyOpen ? collapseAll : expandAll}
           style={{
-            background:'none', border:'1px solid var(--border)', borderRadius:7,
-            padding:'5px 12px', fontSize:12, fontWeight:600, color:'var(--text-muted)',
-            cursor:'pointer', display:'flex', alignItems:'center', gap:5,
+            background:"none", border:"1px solid var(--border)", borderRadius:7,
+            padding:"5px 12px", fontSize:12, fontWeight:600, color:"var(--text-muted)",
+            cursor:"pointer", display:"flex", alignItems:"center", gap:5,
           }}>
-          {anyOpen ? '⊟ סגור הכל' : '⊞ פתח הכל'}
+          {anyOpen ? "⊟ סגור הכל" : "⊞ פתח הכל"}
         </button>
       </div>
 
-      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-        {groups.map(group => {
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {sorted.map(group => {
           const isOpen = !!openGroups[group.label]
+          const isFav  = !!favGroups[group.label]
+          const borderColor = isFav ? "#f59e0b" : group.color.text
+          const bgColor     = isFav ? "rgba(245,158,11,0.07)" : group.color.bg
+
           return (
             <div key={group.label} style={{
-              border: `1px solid ${group.color.border}`,
-              borderRadius:12, overflow:'hidden',
+              border: isFav ? "1.5px solid rgba(245,158,11,0.4)" : `1px solid ${group.color.border}`,
+              borderRadius:12, overflow:"hidden",
+              boxShadow: isFav ? "0 2px 10px rgba(245,158,11,0.1)" : "none",
             }}>
-              {/* כותרת קטגוריה — לחיצה לקפל/פתח */}
               <button
                 onClick={() => toggle(group.label)}
                 style={{
-                  width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'12px 16px',
-                  background: isOpen ? group.color.bg : 'var(--surface)',
-                  border:'none', cursor:'pointer',
-                  borderRight: `4px solid ${group.color.text}`,
-                  transition:'background 0.18s',
+                  width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+                  padding:"12px 16px",
+                  background: isOpen ? bgColor : "var(--surface)",
+                  border:"none", cursor:"pointer",
+                  borderRight: `4px solid ${borderColor}`,
+                  transition:"background 0.18s",
                 }}
               >
-                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <h3 style={{ fontWeight:800, fontSize:16, color: group.color.text, margin:0 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  {/* כפתור מועדף קטגוריה */}
+                  <button
+                    onClick={(e) => toggleFavGroup(group.label, e)}
+                    title={isFav ? "הסר ממועדפים" : "נעץ בראש הרשימה"}
+                    style={{
+                      background:"none", border:"none", cursor:"pointer",
+                      fontSize:18, lineHeight:1, padding:"2px 4px",
+                      color: isFav ? "#f59e0b" : "#d1d5db",
+                      transition:"all 0.15s", flexShrink:0,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color="#f59e0b"; e.currentTarget.style.transform="scale(1.2)" }}
+                    onMouseLeave={e => { e.currentTarget.style.color = isFav ? "#f59e0b" : "#d1d5db"; e.currentTarget.style.transform="scale(1)" }}
+                  >
+                    {isFav ? "★" : "☆"}
+                  </button>
+
+                  <h3 style={{ fontWeight:800, fontSize:16, color: isFav ? "#d97706" : group.color.text, margin:0 }}>
+                    {isFav && <span style={{ fontSize:11, marginLeft:6, verticalAlign:"middle", background:"rgba(245,158,11,0.15)", color:"#d97706", borderRadius:99, padding:"1px 7px", fontWeight:700 }}>נעוץ</span>}
                     {group.label}
                   </h3>
                   <span style={{
-                    background: group.color.bg,
-                    border: `1px solid ${group.color.border}`,
-                    color: group.color.text,
-                    borderRadius:99, padding:'1px 9px', fontSize:11, fontWeight:800,
+                    background: isFav ? "rgba(245,158,11,0.15)" : group.color.bg,
+                    border: `1px solid ${isFav ? "rgba(245,158,11,0.3)" : group.color.border}`,
+                    color: isFav ? "#d97706" : group.color.text,
+                    borderRadius:99, padding:"1px 9px", fontSize:11, fontWeight:800,
                   }}>
                     {group.items.length}
                   </span>
                 </div>
                 <span style={{
-                  fontSize:18, color: group.color.text,
-                  transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
-                  transition:'transform 0.22s',
-                  display:'block', lineHeight:1,
+                  fontSize:18, color: isFav ? "#d97706" : group.color.text,
+                  transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                  transition:"transform 0.22s", display:"block", lineHeight:1,
                 }}>▾</span>
               </button>
 
-              {/* תוכן — מוצג רק כשפתוח */}
               {isOpen && (
                 <div style={{
-                  padding:'12px 14px 14px',
-                  background:'var(--bg)',
-                  borderTop: `1px solid ${group.color.border}`,
+                  padding:"12px 14px 14px",
+                  background:"var(--bg)",
+                  borderTop: `1px solid ${isFav ? "rgba(245,158,11,0.2)" : group.color.border}`,
                 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(270px,1fr))', gap:10 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(270px,1fr))", gap:10 }}>
                     {group.items.map(c => (
                       <CouponCard key={c.id} coupon={c}
-                        brandColor={group.color}
+                        brandColor={isFav ? { bg:"rgba(245,158,11,0.06)", border:"rgba(245,158,11,0.2)", text:"#d97706", bar:"linear-gradient(90deg,#f59e0b,#d97706)" } : group.color}
                         onRedeem={onRedeem} onRestore={onRestore}
-                        onEdit={onEdit} onDelete={onDelete} onExpand={onExpand}
-                        onFavorite={onFavorite} />
+                        onEdit={onEdit} onDelete={onDelete} onExpand={onExpand} />
                     ))}
                   </div>
                 </div>
@@ -765,46 +782,12 @@ export default function CouponsApp({ activePage, onPageChange }) {
       {/* Grouped view — מועדפים נעוצים + accordion */}
       {grouped && filtered.length > 0 && (
         <div>
-          {/* מועדפים — נעוצים תמיד בראש */}
-          {filtered.some(c => c.is_favorite) && (
-            <div style={{ marginBottom:18 }}>
-              <div style={{
-                display:'flex', alignItems:'center', gap:8, marginBottom:10,
-                padding:'9px 14px',
-                background:'rgba(245,158,11,0.08)',
-                border:'1px solid rgba(245,158,11,0.25)',
-                borderRadius:10,
-                borderRight:'4px solid #f59e0b',
-              }}>
-                <span style={{ fontSize:16 }}>★</span>
-                <h3 style={{ fontWeight:800, fontSize:15, color:'#d97706', margin:0 }}>מועדפים</h3>
-                <span style={{
-                  background:'rgba(245,158,11,0.15)', color:'#d97706',
-                  borderRadius:99, padding:'1px 8px', fontSize:11, fontWeight:800,
-                }}>
-                  {filtered.filter(c => c.is_favorite).length}
-                </span>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(270px,1fr))', gap:10 }}>
-                {filtered.filter(c => c.is_favorite).map(c => (
-                  <CouponCard key={c.id} coupon={c}
-                    brandColor={{ bg:'rgba(245,158,11,0.06)', border:'rgba(245,158,11,0.2)', text:'#d97706', bar:'linear-gradient(90deg,#f59e0b,#d97706)' }}
-                    onRedeem={redeem} onRestore={restore}
-                    onEdit={c => { setEditing(c); setModal(true) }}
-                    onDelete={id => confirm('למחוק קופון זה?') && remove(id)}
-                    onExpand={setExpanded}
-                    onFavorite={(id, cur) => toggleFavorite(id, cur)} />
-                ))}
-              </div>
-            </div>
-          )}
           <GroupedCoupons
             groups={groups}
             onRedeem={redeem} onRestore={restore}
             onEdit={c => { setEditing(c); setModal(true) }}
             onDelete={id => confirm('למחוק קופון זה?') && remove(id)}
             onExpand={setExpanded}
-            onFavorite={(id, cur) => toggleFavorite(id, cur)}
           />
         </div>
       )}
