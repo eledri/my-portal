@@ -11,15 +11,24 @@ const ICONS  = ['📁','💰','💸','🏠','🚗','🛒','🎬','💊','✈️'
 // ── hooks ──────────────────────────────────────────────────────────────────
 function useFinanceData() {
   const { user } = useAuth()
-  const [group, setGroup]           = useState(null)
-  const [groups, setGroups]         = useState([])
+  const [groupId, setGroupId]       = useState(null)
+  const [group,   setGroup]         = useState(null)
+  const [groups,  setGroups]        = useState([])
   const [categories, setCategories] = useState([])
-  const [records, setRecords]       = useState([])
-  const [members, setMembers]       = useState([])
-  const [loading, setLoading]       = useState(true)
+  const [records,    setRecords]    = useState([])
+  const [members,    setMembers]    = useState([])
+  const [loading,    setLoading]    = useState(true)
 
-  // ref מתעדכן מיידית — פותר את בעיית ה-stale closure
-  const groupRef = useRef(null)
+  const loadGroupData = useCallback(async (gid) => {
+    const [cats, recs, mems] = await Promise.all([
+      supabase.from('fin_categories').select('*').eq('group_id', gid).order('name'),
+      supabase.from('fin_records').select('*, fin_categories(name,color,icon)').eq('group_id', gid).order('date', { ascending: false }),
+      supabase.from('fin_group_members').select('*, users:user_id(email)').eq('group_id', gid),
+    ])
+    setCategories(cats.data || [])
+    setRecords(recs.data || [])
+    setMembers(mems.data || [])
+  }, [])
 
   const fetchAll = useCallback(async () => {
     if (!user) return
@@ -30,84 +39,87 @@ function useFinanceData() {
 
     if (!groupsData?.length) { setLoading(false); return }
 
-    const firstGroup = groupsData[0]
+    const first = groupsData[0]
     setGroups(groupsData)
-    // עדכן גם את ה-ref מיידית
-    if (!groupRef.current) groupRef.current = firstGroup
-    setGroup(g => { if (!g) groupRef.current = firstGroup; return g || firstGroup })
-
-    const gid = groupRef.current?.id || firstGroup.id
-    const [cats, recs, mems] = await Promise.all([
-      supabase.from('fin_categories').select('*').eq('group_id', gid).order('name'),
-      supabase.from('fin_records').select('*, fin_categories(name,color,icon)').eq('group_id', gid).order('date', { ascending: false }),
-      supabase.from('fin_group_members').select('*, users:user_id(email)').eq('group_id', gid),
-    ])
-    setCategories(cats.data || [])
-    setRecords(recs.data || [])
-    setMembers(mems.data || [])
+    setGroup(first)
+    setGroupId(first.id)
+    await loadGroupData(first.id)
     setLoading(false)
-  }, [user])
+  }, [user, loadGroupData])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // עדכן ref כשהקבוצה הפעילה משתנה (כשמחליפים מאגר)
-  const setGroupSynced = useCallback((g) => {
-    groupRef.current = g
+  // כשמחליפים מאגר — גם groupId מתעדכן
+  const switchGroup = useCallback((g) => {
     setGroup(g)
-  }, [])
+    setGroupId(g.id)
+    loadGroupData(g.id)
+  }, [loadGroupData])
 
-  // פונקציות שמשתמשות ב-ref במקום ב-state (פותר stale closure)
-  const getGroupId = () => groupRef.current?.id
-
-  const addCategory = async (d) => {
-    const gid = getGroupId()
-    if (!gid) return { error: new Error('לא נמצאה קבוצה פעילה') }
-    const { data, error } = await supabase.from('fin_categories').insert({ ...d, group_id: gid }).select().single()
+  // כל פונקציה מקבלת gid ישירות — אין תלות ב-state
+  const addCategory = useCallback(async (d) => {
+    if (!groupId) return { error: new Error('אין קבוצה פעילה') }
+    const { data, error } = await supabase.from('fin_categories')
+      .insert({ ...d, group_id: groupId }).select().single()
     if (!error) setCategories(p => [...p, data])
     return { error }
-  }
+  }, [groupId])
+
   const deleteCategory = async (id) => {
     const { error } = await supabase.from('fin_categories').delete().eq('id', id)
     if (!error) setCategories(p => p.filter(c => c.id !== id))
     return { error }
   }
-  const addRecord = async (d) => {
-    const gid = getGroupId()
-    if (!gid) return { error: new Error('לא נמצאה קבוצה פעילה') }
-    const { data, error } = await supabase.from('fin_records').insert({ ...d, group_id: gid, created_by: user.id }).select('*, fin_categories(name,color,icon)').single()
+
+  const addRecord = useCallback(async (d) => {
+    if (!groupId) return { error: new Error('אין קבוצה פעילה') }
+    const { data, error } = await supabase.from('fin_records')
+      .insert({ ...d, group_id: groupId, created_by: user.id })
+      .select('*, fin_categories(name,color,icon)').single()
     if (!error) setRecords(p => [data, ...p])
     return { error }
-  }
+  }, [groupId, user])
+
   const updateRecord = async (id, d) => {
-    const { data, error } = await supabase.from('fin_records').update(d).eq('id', id).select('*, fin_categories(name,color,icon)').single()
+    const { data, error } = await supabase.from('fin_records')
+      .update(d).eq('id', id).select('*, fin_categories(name,color,icon)').single()
     if (!error) setRecords(p => p.map(r => r.id === id ? data : r))
     return { error }
   }
+
   const deleteRecord = async (id) => {
     const { error } = await supabase.from('fin_records').delete().eq('id', id)
     if (!error) setRecords(p => p.filter(r => r.id !== id))
     return { error }
   }
-  const inviteMember = async (email) => {
-    const gid = getGroupId()
-    if (!gid) return { error: new Error('לא נמצאה קבוצה') }
-    const { data, error } = await supabase.from('fin_share_invites').insert({
-      group_id: gid, invited_email: email, invited_by: user.id
-    }).select().single()
+
+  const inviteMember = useCallback(async (email) => {
+    if (!groupId) return { error: new Error('אין קבוצה פעילה') }
+    const { data, error } = await supabase.from('fin_share_invites')
+      .insert({ group_id: groupId, invited_email: email, invited_by: user.id })
+      .select().single()
     return { data, error }
-  }
+  }, [groupId, user])
+
   const acceptInvite = async (token) => {
-    const { data: inv, error } = await supabase.from('fin_share_invites').select('*').eq('token', token).eq('status', 'pending').single()
+    const { data: inv, error } = await supabase.from('fin_share_invites')
+      .select('*').eq('token', token).eq('status', 'pending').single()
     if (error || !inv) return { error: new Error('טוקן לא תקף') }
-    const { error: me } = await supabase.from('fin_group_members').insert({ group_id: inv.group_id, user_id: user.id, role: 'member' })
+    const { error: me } = await supabase.from('fin_group_members')
+      .insert({ group_id: inv.group_id, user_id: user.id, role: 'member' })
     if (me) return { error: me }
     await supabase.from('fin_share_invites').update({ status: 'accepted' }).eq('id', inv.id)
     await fetchAll()
     return { data: inv }
   }
 
-  return { group, groups, setGroup: setGroupSynced, categories, records, members, loading,
-    addCategory, deleteCategory, addRecord, updateRecord, deleteRecord, inviteMember, acceptInvite }
+  return {
+    group, groups, setGroup: switchGroup,
+    categories, records, members, loading,
+    addCategory, deleteCategory,
+    addRecord, updateRecord, deleteRecord,
+    inviteMember, acceptInvite
+  }
 }
 
 // ── Sidebar / Bottom Nav ──────────────────────────────────────────────────
