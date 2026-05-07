@@ -120,8 +120,9 @@ function useCoupons() {
 
   const redeem = (id) => update(id, { redeemed: true, redeemed_at: new Date().toISOString() })
   const restore = (id) => update(id, { redeemed: false, redeemed_at: null })
+  const toggleFavorite = (id, current) => update(id, { is_favorite: !current })
 
-  return { coupons, loading, add, update, remove, redeem, restore }
+  return { coupons, loading, add, update, remove, redeem, restore, toggleFavorite }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -361,7 +362,7 @@ function ExpandModal({ coupon, onClose, onCopy, copied }) {
 // ─────────────────────────────────────────────────────────────
 // Coupon Card
 // ─────────────────────────────────────────────────────────────
-function CouponCard({ coupon, brandColor, onRedeem, onRestore, onEdit, onDelete, onExpand }) {
+function CouponCard({ coupon, brandColor, onRedeem, onRestore, onEdit, onDelete, onExpand, onFavorite }) {
   const { copy, copied } = useCopy()
   const isExpired = coupon.expiry_date && isPast(new Date(coupon.expiry_date + 'T23:59:59'))
   const daysLeft = coupon.expiry_date
@@ -382,6 +383,9 @@ function CouponCard({ coupon, brandColor, onRedeem, onRestore, onEdit, onDelete,
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            {coupon.is_favorite && (
+              <span style={{ fontSize:14, color:'#f59e0b' }} title="מועדף">★</span>
+            )}
             <h3 style={{ fontWeight:800, fontSize:16, margin:0 }}>{coupon.name}</h3>
             {isExpired && <span className="badge" style={{ background:'rgba(220,38,38,0.1)', color:'var(--red)', fontSize:10 }}>פג תוקף</span>}
             {coupon.redeemed && <span className="badge" style={{ background:'rgba(5,150,105,0.1)', color:'var(--green)', fontSize:10 }}>מומש</span>}
@@ -391,6 +395,16 @@ function CouponCard({ coupon, brandColor, onRedeem, onRestore, onEdit, onDelete,
           )}
         </div>
         <div style={{ display:'flex', gap:2, flexShrink:0, marginRight:6 }}>
+          <button
+            onClick={() => onFavorite?.(coupon.id, coupon.is_favorite)}
+            title={coupon.is_favorite ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+            style={{ background:'none', border:'none', cursor:'pointer', fontSize:17, padding:4,
+              color: coupon.is_favorite ? '#f59e0b' : 'var(--text-muted)',
+              transition:'transform 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform='scale(1.2)'}
+            onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}
+          >{coupon.is_favorite ? '★' : '☆'}</button>
           {!coupon.redeemed && <button onClick={() => onEdit(coupon)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4,color:'var(--text-muted)' }}>✏️</button>}
           <button onClick={() => onDelete(coupon.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4,color:'var(--text-muted)' }}>🗑️</button>
         </div>
@@ -510,16 +524,20 @@ function groupByBrand(coupons) {
   const map = {}
   let colorIdx = 0
   coupons.forEach(c => {
-    const brand = c.name.split(/[\s\-_]/)[0].toLowerCase()
-    if (!map[brand]) {
-      map[brand] = {
-        label: c.name.split(/[\s\-_]/)[0],
+    // מפתח לפי מילה ראשונה (לקיבוץ), אבל מציג את השם המלא
+    const key = c.name.split(/[\s\-_]/)[0].toLowerCase()
+    if (!map[key]) {
+      map[key] = {
+        label: c.name,   // שם מלא
         color: BRAND_COLORS[colorIdx % BRAND_COLORS.length],
         items: []
       }
       colorIdx++
+    } else {
+      // אם כבר קיים — בחר את השם הקצר יותר כברירת מחדל (או השאר הראשון)
+      // בכל מקרה — הצג את השם המלא של הרשומה הראשונה שנרשמה
     }
-    map[brand].items.push(c)
+    map[key].items.push(c)
   })
   return Object.values(map).sort((a,b) => b.items.length - a.items.length)
 }
@@ -527,7 +545,7 @@ function groupByBrand(coupons) {
 // ─────────────────────────────────────────────────────────────
 // Grouped Accordion — קטגוריות עם קפל/פתח
 // ─────────────────────────────────────────────────────────────
-function GroupedCoupons({ groups, onRedeem, onRestore, onEdit, onDelete, onExpand }) {
+function GroupedCoupons({ groups, onRedeem, onRestore, onEdit, onDelete, onExpand, onFavorite }) {
   // כל הקטגוריות סגורות בהתחלה — רק הראשונה פתוחה
   const [openGroups, setOpenGroups] = useState(() => {
     const init = {}
@@ -616,7 +634,8 @@ function GroupedCoupons({ groups, onRedeem, onRestore, onEdit, onDelete, onExpan
                       <CouponCard key={c.id} coupon={c}
                         brandColor={group.color}
                         onRedeem={onRedeem} onRestore={onRestore}
-                        onEdit={onEdit} onDelete={onDelete} onExpand={onExpand} />
+                        onEdit={onEdit} onDelete={onDelete} onExpand={onExpand}
+                        onFavorite={onFavorite} />
                     ))}
                   </div>
                 </div>
@@ -633,7 +652,7 @@ function GroupedCoupons({ groups, onRedeem, onRestore, onEdit, onDelete, onExpan
 // Main App
 // ─────────────────────────────────────────────────────────────
 export default function CouponsApp({ activePage, onPageChange }) {
-  const { coupons, loading, add, update, remove, redeem, restore } = useCoupons()
+  const { coupons, loading, add, update, remove, redeem, restore, toggleFavorite } = useCoupons()
   const [tab, setTab]         = useState('active')   // 'active' | 'history'
   const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState(null)
@@ -656,6 +675,8 @@ export default function CouponsApp({ activePage, onPageChange }) {
       const amt = +amountFilter
       list = list.filter(c => c.amount != null && +c.amount >= amt)
     }
+    // מועדפים תמיד ראשונים
+    list.sort((a, b) => (b.is_favorite ? 1 : 0) - (a.is_favorite ? 1 : 0))
     return list
   }, [coupons, tab, search, amountFilter])
 
@@ -741,15 +762,51 @@ export default function CouponsApp({ activePage, onPageChange }) {
         </div>
       )}
 
-      {/* Grouped view — accordion */}
+      {/* Grouped view — מועדפים נעוצים + accordion */}
       {grouped && filtered.length > 0 && (
-        <GroupedCoupons
-          groups={groups}
-          onRedeem={redeem} onRestore={restore}
-          onEdit={c => { setEditing(c); setModal(true) }}
-          onDelete={id => confirm('למחוק קופון זה?') && remove(id)}
-          onExpand={setExpanded}
-        />
+        <div>
+          {/* מועדפים — נעוצים תמיד בראש */}
+          {filtered.some(c => c.is_favorite) && (
+            <div style={{ marginBottom:18 }}>
+              <div style={{
+                display:'flex', alignItems:'center', gap:8, marginBottom:10,
+                padding:'9px 14px',
+                background:'rgba(245,158,11,0.08)',
+                border:'1px solid rgba(245,158,11,0.25)',
+                borderRadius:10,
+                borderRight:'4px solid #f59e0b',
+              }}>
+                <span style={{ fontSize:16 }}>★</span>
+                <h3 style={{ fontWeight:800, fontSize:15, color:'#d97706', margin:0 }}>מועדפים</h3>
+                <span style={{
+                  background:'rgba(245,158,11,0.15)', color:'#d97706',
+                  borderRadius:99, padding:'1px 8px', fontSize:11, fontWeight:800,
+                }}>
+                  {filtered.filter(c => c.is_favorite).length}
+                </span>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(270px,1fr))', gap:10 }}>
+                {filtered.filter(c => c.is_favorite).map(c => (
+                  <CouponCard key={c.id} coupon={c}
+                    brandColor={{ bg:'rgba(245,158,11,0.06)', border:'rgba(245,158,11,0.2)', text:'#d97706', bar:'linear-gradient(90deg,#f59e0b,#d97706)' }}
+                    onRedeem={redeem} onRestore={restore}
+                    onEdit={c => { setEditing(c); setModal(true) }}
+                    onDelete={id => confirm('למחוק קופון זה?') && remove(id)}
+                    onExpand={setExpanded}
+                    onFavorite={(id, cur) => toggleFavorite(id, cur)} />
+                ))}
+              </div>
+            </div>
+          )}
+          <GroupedCoupons
+            groups={groups}
+            onRedeem={redeem} onRestore={restore}
+            onEdit={c => { setEditing(c); setModal(true) }}
+            onDelete={id => confirm('למחוק קופון זה?') && remove(id)}
+            onExpand={setExpanded}
+            onFavorite={(id, cur) => toggleFavorite(id, cur)}
+          />
+        </div>
       )}
 
       {/* Flat view */}
@@ -760,7 +817,8 @@ export default function CouponsApp({ activePage, onPageChange }) {
               onRedeem={redeem} onRestore={restore}
               onEdit={c => { setEditing(c); setModal(true) }}
               onDelete={id => confirm('למחוק קופון זה?') && remove(id)}
-              onExpand={setExpanded} />
+              onExpand={setExpanded}
+              onFavorite={(id, cur) => toggleFavorite(id, cur)} />
           ))}
         </div>
       )}

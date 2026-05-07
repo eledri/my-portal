@@ -221,12 +221,13 @@ CREATE TABLE coupons (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
-  code TEXT NOT NULL,
+  code TEXT,
   url TEXT,
   amount NUMERIC(10,2),
   expiry_date DATE,
   redeemed BOOLEAN DEFAULT FALSE,
   redeemed_at TIMESTAMPTZ,
+  is_favorite BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
