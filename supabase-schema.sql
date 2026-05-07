@@ -211,3 +211,25 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_portal_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_portal_user();
+
+-- ════════════════════════════════════════════════════════════
+-- COUPONS MODULE (coupons)
+-- ════════════════════════════════════════════════════════════
+
+CREATE TABLE coupons (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  code TEXT NOT NULL,
+  url TEXT,
+  amount NUMERIC(10,2),
+  expiry_date DATE,
+  redeemed BOOLEAN DEFAULT FALSE,
+  redeemed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE coupons ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "coupons_own" ON coupons FOR ALL USING (user_id = auth.uid());
+

@@ -141,7 +141,7 @@ function PolicyModal({ categories, onSave, onClose, initial }) {
 
   return (
     <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
-      <div className="card fade-up" style={{ width:'100%', maxWidth:540, padding:28, maxHeight:'92vh', overflowY:'auto' }}>
+      <div className="modal-box fade-up" style={{ maxWidth:540 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:22 }}>
           <h3 style={{ fontWeight:800, fontSize:18 }}>{initial ? 'עריכת ביטוח' : 'ביטוח חדש'}</h3>
           <button onClick={onClose} style={{ background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:20 }}>✕</button>
@@ -398,7 +398,7 @@ function CategoriesPage({ categories, policies, addCategory, deleteCategory }) {
   const policyCount = (id) => policies.filter(p => p.category_id === id).length
 
   return (
-    <div style={{ padding:28, maxWidth:800 }}>
+    <div className="page-content">
       <h2 style={{ fontWeight:900, fontSize:24, marginBottom:22 }}>קטגוריות ביטוח</h2>
       <div className="card" style={{ padding:20, marginBottom:22 }}>
         <h3 style={{ fontWeight:700, marginBottom:16, fontSize:15 }}>קטגוריה חדשה</h3>
@@ -422,7 +422,7 @@ function CategoriesPage({ categories, policies, addCategory, deleteCategory }) {
           <button className="btn btn-primary" onClick={add} disabled={saving}>{saving?'...':'+ הוסף'}</button>
         </div>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:14 }}>
+      <div className="cat-grid">
         {categories.map(cat => (
           <div key={cat.id} className="card fade-up" style={{ padding:18 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
@@ -449,7 +449,7 @@ function SummaryBar({ policies }) {
   const expired    = policies.filter(p => p.end_date && isPast(new Date(p.end_date))).length
 
   return (
-    <div style={{ display:'flex', gap:14, marginBottom:24 }} className="stagger">
+    <div className="stat-grid stagger" style={{ marginBottom:18 }}>
       {[
         { label:'פוליסות', value: policies.length, color:'var(--accent2)', icon:'🛡️' },
         { label:'עלות כוללת', value: `₪${total.toLocaleString()}`, color:'var(--text)', icon:'💰' },
@@ -483,41 +483,42 @@ export default function InsuranceApp() {
   const [filterCat, setFilterCat] = useState('')
   const data = useInsuranceData()
 
-  if (data.loading) return <div style={{ display:'grid',placeItems:'center',height:'60vh',color:'var(--text-muted)' }}>טוען...</div>
+  if (data.loading) return <div style={{ display:'grid',placeItems:'center',height:'100%',color:'var(--text-muted)' }}>טוען...</div>
 
   const filtered = filterCat ? data.policies.filter(p => p.category_id === filterCat) : data.policies
 
   return (
-    <div style={{ display:'flex', height:'100%' }}>
+    <div className="app-layout" style={{ height:'100%' }}>
       {/* Sidebar */}
-      <aside style={{ width:200, background:'var(--surface)', borderLeft:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0 }}>
-        <nav style={{ flex:1, padding:'14px 10px' }}>
+      <aside className="app-sidebar">
+        <nav style={{ flex:1, padding:'10px 8px', display:'flex', flexDirection:'column' }}>
           {NAV.map(n => (
             <button key={n.k} onClick={() => setPage(n.k)}
+              className={`nav-btn${page===n.k ? ' active' : ''}`}
               style={{
-                width:'100%', display:'flex', alignItems:'center', gap:10,
-                padding:'9px 12px', borderRadius:10, border:'none',
-                background: page===n.k ? 'var(--accent-glow)' : 'transparent',
-                color: page===n.k ? 'var(--accent2)' : 'var(--text-muted)',
+                width:'100%', display:'flex', alignItems:'center', gap:8,
+                padding:'9px 12px', borderRadius:9, border:'none',
+                background: page===n.k ? 'rgba(37,99,235,0.08)' : 'transparent',
+                color: page===n.k ? 'var(--accent)' : 'var(--text-muted)',
                 fontFamily:'Heebo', fontWeight: page===n.k ? 700 : 500,
                 fontSize:14, cursor:'pointer', textAlign:'right',
                 borderRight: page===n.k ? '2px solid var(--accent)' : '2px solid transparent',
-                marginBottom:2, transition:'all 0.18s',
+                marginBottom:2, transition:'all 0.16s', flexShrink:0,
               }}>
-              <span>{n.icon}</span><span>{n.label}</span>
+              <span className="nav-icon" style={{ fontSize:18 }}>{n.icon}</span><span>{n.label}</span>
             </button>
           ))}
         </nav>
       </aside>
 
       {/* Main */}
-      <main style={{ flex:1, overflowY:'auto', padding:28 }}>
+      <main className="app-main">
         {page === 'categories' ? (
           <CategoriesPage categories={data.categories} policies={data.policies} addCategory={data.addCategory} deleteCategory={data.deleteCategory} />
         ) : (
-          <div style={{ maxWidth:900 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:22 }}>
-              <h2 style={{ fontWeight:900, fontSize:24 }}>ניהול ביטוחים</h2>
+          <div className="page-content">
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+              <h2 style={{ fontWeight:900, fontSize:22 }}>ניהול ביטוחים</h2>
               <button className="btn btn-primary" onClick={() => { setEditing(null); setModal(true) }}>+ ביטוח חדש</button>
             </div>
 

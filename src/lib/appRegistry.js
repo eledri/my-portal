@@ -5,6 +5,7 @@
 
 import FinanceApp   from '../apps/finance/FinanceApp.jsx'
 import InsuranceApp from '../apps/insurance/InsuranceApp.jsx'
+import CouponsApp   from '../apps/coupons/CouponsApp.jsx'
 
 export const APPS = [
   {
@@ -26,6 +27,16 @@ export const APPS = [
     gradient:    'linear-gradient(135deg, #3b82f6, #1d4ed8)',
     component:   InsuranceApp,
     tags:        ['ביטוח', 'פוליסות', 'מסמכים'],
+  },
+  {
+    id:          'coupons',
+    title:       'הקופונים שלי',
+    description: 'ניהול קופונים, הדבקה חכמה, מעקב תוקף והיסטוריה',
+    icon:        '🎟️',
+    color:       '#8b5cf6',
+    gradient:    'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+    component:   CouponsApp,
+    tags:        ['קופונים', 'הנחות'],
   },
   // ── הוסף כלים נוספים כאן ──
   // {

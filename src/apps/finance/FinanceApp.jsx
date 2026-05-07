@@ -90,9 +90,9 @@ function useFinanceData() {
     addCategory, deleteCategory, addRecord, updateRecord, deleteRecord, inviteMember, acceptInvite }
 }
 
-// ── Sidebar ─────────────────────────────────────────────────────────────────
+// ── Sidebar / Bottom Nav ──────────────────────────────────────────────────
 const NAV = [
-  { k:'dashboard', icon:'📊', label:'לוח בקרה' },
+  { k:'dashboard', icon:'📊', label:'בקרה' },
   { k:'records',   icon:'📝', label:'רשומות' },
   { k:'categories',icon:'🗂️', label:'קטגוריות' },
   { k:'analytics', icon:'📈', label:'אנליזה' },
@@ -100,33 +100,31 @@ const NAV = [
 ]
 function Sidebar({ page, setPage, groups, group, setGroup }) {
   return (
-    <aside style={{
-      width: 220, background: 'var(--surface)', borderLeft: '1px solid var(--border)',
-      display: 'flex', flexDirection: 'column', flexShrink: 0,
-    }}>
+    <aside className="app-sidebar">
       {groups.length > 1 && (
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-          <label className="label">מאגר</label>
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
           <select className="input" style={{ padding: '7px 10px', fontSize: 13 }}
             value={group?.id || ''} onChange={e => setGroup(groups.find(g => g.id === e.target.value))}>
             {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
         </div>
       )}
-      <nav style={{ flex: 1, padding: '12px 10px' }}>
+      <nav style={{ flex: 1, padding: '10px 8px', display: 'flex', flexDirection: 'column' }}>
         {NAV.map(n => (
           <button key={n.k} onClick={() => setPage(n.k)}
+            className={`nav-btn${page === n.k ? ' active' : ''}`}
             style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-              padding: '9px 12px', borderRadius: 10, border: 'none',
-              background: page === n.k ? 'var(--accent-glow)' : 'transparent',
-              color: page === n.k ? 'var(--accent2)' : 'var(--text-muted)',
+              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+              padding: '9px 12px', borderRadius: 9, border: 'none',
+              background: page === n.k ? 'rgba(37,99,235,0.08)' : 'transparent',
+              color: page === n.k ? 'var(--accent)' : 'var(--text-muted)',
               fontFamily: 'Heebo', fontWeight: page === n.k ? 700 : 500,
               fontSize: 14, cursor: 'pointer', textAlign: 'right',
               borderRight: page === n.k ? '2px solid var(--accent)' : '2px solid transparent',
-              marginBottom: 2, transition: 'all 0.18s',
+              marginBottom: 2, transition: 'all 0.16s', flexShrink: 0,
             }}>
-            <span>{n.icon}</span><span>{n.label}</span>
+            <span className="nav-icon" style={{ fontSize: 18 }}>{n.icon}</span>
+            <span>{n.label}</span>
           </button>
         ))}
       </nav>
@@ -154,27 +152,27 @@ function Dashboard({ records }) {
   }, [month])
 
   const Stat = ({ label, val, color, icon }) => (
-    <div className="card fade-up" style={{ padding: 20, flex: 1 }}>
+    <div className="card fade-up" style={{ padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ color: 'var(--text-muted)', fontSize: 12, fontWeight: 600, textTransform:'uppercase', letterSpacing:0.5, marginBottom: 8 }}>{label}</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color }}> ₪{Math.abs(val).toLocaleString()}</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform:'uppercase', letterSpacing:0.4, marginBottom: 6 }}>{label}</div>
+          <div style={{ fontSize: 'clamp(18px,4vw,24px)', fontWeight: 900, color }}> ₪{Math.abs(val).toLocaleString()}</div>
         </div>
-        <div style={{ fontSize: 22, width: 44, height: 44, borderRadius: 12, background: `${color}18`, display:'grid', placeItems:'center' }}>{icon}</div>
+        <div style={{ fontSize: 20, width: 38, height: 38, borderRadius: 10, background: `${color}18`, display:'grid', placeItems:'center', flexShrink:0 }}>{icon}</div>
       </div>
     </div>
   )
 
   return (
-    <div style={{ padding: 28, maxWidth: 860 }}>
-      <h2 style={{ fontWeight: 900, fontSize: 24, marginBottom: 6 }}>לוח בקרה</h2>
-      <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>{format(now, 'MMMM yyyy')}</p>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+    <div className="page-content">
+      <h2 style={{ fontWeight: 900, fontSize: 22, marginBottom: 4 }}>לוח בקרה</h2>
+      <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 18 }}>{format(now, 'MMMM yyyy')}</p>
+      <div className="stat-grid" style={{ marginBottom: 18 }}>
         <Stat label="הכנסות" val={income} color="var(--green)" icon="💰" />
         <Stat label="הוצאות" val={expense} color="var(--red)" icon="💸" />
         <Stat label="מאזן" val={balance} color={balance >= 0 ? 'var(--green)' : 'var(--red)'} icon="⚖️" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="two-col">
         <div className="card" style={{ padding: 20 }}>
           <h3 style={{ fontWeight: 700, marginBottom: 16, fontSize: 15 }}>הוצאות לפי קטגוריה</h3>
           {bycat.length === 0 ? <p style={{ color:'var(--text-muted)', fontSize:14 }}>אין הוצאות</p> :
@@ -231,7 +229,7 @@ function RecordModal({ categories, onSave, onClose, initial }) {
 
   return (
     <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
-      <div className="card fade-up" style={{ width:'100%', maxWidth:460, padding:28, maxHeight:'90vh', overflowY:'auto' }}>
+      <div className="modal-box fade-up" style={{ maxWidth:460 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:22 }}>
           <h3 style={{ fontWeight:800, fontSize:18 }}>{initial ? 'עריכה' : 'רשומה חדשה'}</h3>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', fontSize:20 }}>✕</button>
@@ -298,66 +296,89 @@ function RecordsPage({ records, categories, addRecord, updateRecord, deleteRecor
   }, [records, ft, search])
 
   return (
-    <div style={{ padding: 28, maxWidth: 900 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:22 }}>
-        <h2 style={{ fontWeight:900, fontSize:24 }}>רשומות</h2>
-        <button className="btn btn-primary" onClick={() => { setEditing(null); setModal(true) }}>+ רשומה חדשה</button>
+    <div className="page-content">
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+        <h2 style={{ fontWeight:900, fontSize:22 }}>רשומות</h2>
+        <button className="btn btn-primary" style={{ padding:'9px 14px', fontSize:13 }}
+          onClick={() => { setEditing(null); setModal(true) }}>+ חדשה</button>
       </div>
-      <div className="card" style={{ padding:14, marginBottom:16, display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
-        <input className="input" style={{ flex:'1 1 180px', padding:'8px 12px' }} placeholder="חיפוש..." value={search} onChange={e=>setSearch(e.target.value)} />
-        <div style={{ display:'flex', gap:6 }}>
+
+      {/* Filters */}
+      <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
+        <input className="input" style={{ flex:'1 1 140px', padding:'8px 12px', fontSize:14 }}
+          placeholder="חיפוש..." value={search} onChange={e=>setSearch(e.target.value)} />
+        <div style={{ display:'flex', gap:5 }}>
           {[['all','הכל'],['income','💰'],['expense','💸']].map(([v,l]) => (
-            <button key={v} onClick={() => setFt(v)}
-              style={{ padding:'8px 14px', borderRadius:8, border:`1px solid ${ft===v ? 'var(--accent)' : 'var(--border)'}`,
-                background: ft===v ? 'var(--accent-glow)' : 'transparent',
-                color: ft===v ? 'var(--accent2)' : 'var(--text-muted)', cursor:'pointer', fontFamily:'Heebo', fontWeight:600, fontSize:13 }}>{l}</button>
+            <button key={v} onClick={() => setFt(v)} style={{
+              padding:'8px 12px', borderRadius:8, border:`1px solid ${ft===v ? 'var(--accent)' : 'var(--border)'}`,
+              background: ft===v ? 'rgba(37,99,235,0.08)' : 'transparent',
+              color: ft===v ? 'var(--accent)' : 'var(--text-muted)',
+              cursor:'pointer', fontFamily:'Heebo', fontWeight:600, fontSize:13 }}>{l}</button>
           ))}
         </div>
       </div>
-      <div className="card" style={{ overflow:'hidden', padding:0 }}>
-        {filtered.length === 0 ? (
-          <div style={{ padding:40, textAlign:'center', color:'var(--text-muted)' }}>📭 אין רשומות</div>
-        ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+
+      {filtered.length === 0 ? (
+        <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text-muted)' }}>📭 אין רשומות</div>
+      ) : (<>
+        {/* Desktop table */}
+        <div className="card table-wrap" style={{ overflow:'hidden', padding:0 }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom:'1px solid var(--border)' }}>
+              <tr>
                 {['תאריך','כותרת','קטגוריה','תשלומים','סכום',''].map((h,i) => (
-                  <th key={i} style={{ padding:'11px 16px', textAlign: i===4?'left':'right', fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:0.5 }}>{h}</th>
+                  <th key={i} style={{ textAlign: i===4?'left':'right' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r,i) => (
-                <tr key={r.id} style={{ borderBottom: i<filtered.length-1 ? '1px solid var(--border)' : 'none' }}
-                  onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
-                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <td style={{ padding:'11px 16px', fontSize:13, color:'var(--text-muted)' }}>{format(new Date(r.date),'dd/MM/yy')}</td>
-                  <td style={{ padding:'11px 16px', fontWeight:600, fontSize:14 }}>{r.title}</td>
-                  <td style={{ padding:'11px 16px' }}>
-                    {r.fin_categories ? (
-                      <span className="badge" style={{ background:`${r.fin_categories.color}20`, color:r.fin_categories.color, border:`1px solid ${r.fin_categories.color}30` }}>
-                        {r.fin_categories.icon} {r.fin_categories.name}
-                      </span>
-                    ) : <span style={{ color:'var(--text-muted)', fontSize:13 }}>—</span>}
-                  </td>
-                  <td style={{ padding:'11px 16px', fontSize:13, color:'var(--text-muted)' }}>
-                    {r.is_recurring ? `${r.installments_paid}/${r.installments_total}` : '—'}
-                  </td>
-                  <td style={{ padding:'11px 16px', fontWeight:800, fontSize:15, textAlign:'left', color: r.type==='income' ? 'var(--green)' : 'var(--red)' }}>
+              {filtered.map(r => (
+                <tr key={r.id} onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <td style={{ color:'var(--text-muted)', fontSize:12 }}>{format(new Date(r.date),'dd/MM/yy')}</td>
+                  <td style={{ fontWeight:600 }}>{r.title}</td>
+                  <td>{r.fin_categories ? <span className="badge" style={{ background:`${r.fin_categories.color}18`, color:r.fin_categories.color, border:`1px solid ${r.fin_categories.color}28` }}>{r.fin_categories.icon} {r.fin_categories.name}</span> : <span style={{ color:'var(--text-muted)' }}>—</span>}</td>
+                  <td style={{ color:'var(--text-muted)', fontSize:12 }}>{r.is_recurring ? `${r.installments_paid}/${r.installments_total}` : '—'}</td>
+                  <td style={{ fontWeight:800, textAlign:'left', color: r.type==='income' ? 'var(--green)' : 'var(--red)' }}>
                     {r.type==='income' ? '+' : '-'}₪{(+r.amount).toLocaleString()}
                   </td>
-                  <td style={{ padding:'11px 16px' }}>
-                    <div style={{ display:'flex', gap:4 }}>
-                      <button onClick={() => { setEditing(r); setModal(true) }} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15 }}>✏️</button>
-                      <button onClick={() => confirm('למחוק?') && deleteRecord(r.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15 }}>🗑️</button>
+                  <td>
+                    <div style={{ display:'flex', gap:3 }}>
+                      <button onClick={() => { setEditing(r); setModal(true) }} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4 }}>✏️</button>
+                      <button onClick={() => confirm('למחוק?') && deleteRecord(r.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4 }}>🗑️</button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="record-cards">
+          {filtered.map(r => (
+            <div key={r.id} className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{r.title}</div>
+                  <div style={{ fontSize:12, color:'var(--text-muted)', display:'flex', gap:8, flexWrap:'wrap' }}>
+                    <span>{format(new Date(r.date),'dd/MM/yy')}</span>
+                    {r.fin_categories && <span>{r.fin_categories.icon} {r.fin_categories.name}</span>}
+                    {r.is_recurring && <span>תשלום {r.installments_paid}/{r.installments_total}</span>}
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                  <span style={{ fontWeight:900, fontSize:16, color: r.type==='income' ? 'var(--green)' : 'var(--red)' }}>
+                    {r.type==='income' ? '+' : '-'}₪{(+r.amount).toLocaleString()}
+                  </span>
+                  <button onClick={() => { setEditing(r); setModal(true) }} style={{ background:'none',border:'none',cursor:'pointer',fontSize:16,padding:4 }}>✏️</button>
+                  <button onClick={() => confirm('למחוק?') && deleteRecord(r.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:16,padding:4 }}>🗑️</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>)}
+
       {modal && <RecordModal categories={categories} initial={editing}
         onSave={d => editing ? updateRecord(editing.id, d) : addRecord(d)}
         onClose={() => { setModal(false); setEditing(null) }} />}
@@ -385,8 +406,8 @@ function CategoriesPage({ categories, records, addCategory, deleteCategory }) {
   }
 
   return (
-    <div style={{ padding:28, maxWidth:800 }}>
-      <h2 style={{ fontWeight:900, fontSize:24, marginBottom:22 }}>קטגוריות</h2>
+    <div className="page-content">
+      <h2 style={{ fontWeight:900, fontSize:22, marginBottom:18 }}>קטגוריות</h2>
       <div className="card" style={{ padding:20, marginBottom:22 }}>
         <h3 style={{ fontWeight:700, marginBottom:16, fontSize:15 }}>קטגוריה חדשה</h3>
         <div style={{ display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap' }}>
@@ -409,7 +430,7 @@ function CategoriesPage({ categories, records, addCategory, deleteCategory }) {
           <button className="btn btn-primary" onClick={add} disabled={saving}>{saving ? '...' : '+ הוסף'}</button>
         </div>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:14 }}>
+      <div className="cat-grid">
         {categories.map(cat => {
           const s = stats(cat.id)
           return (
@@ -461,8 +482,8 @@ function AnalyticsPage({ records }) {
   const tt = { contentStyle:{ background:'#fff',border:'1px solid var(--border)',borderRadius:8,fontFamily:'Assistant',color:'var(--text)',boxShadow:'0 4px 12px rgba(0,0,0,0.1)' } }
 
   return (
-    <div style={{ padding:28, maxWidth:860 }}>
-      <h2 style={{ fontWeight:900, fontSize:24, marginBottom:22 }}>אנליזה</h2>
+    <div className="page-content">
+      <h2 style={{ fontWeight:900, fontSize:22, marginBottom:18 }}>אנליזה</h2>
       <div className="card" style={{ padding:20, marginBottom:20 }}>
         <h3 style={{ fontWeight:700, marginBottom:16, fontSize:15 }}>הכנסות מול הוצאות — 6 חודשים</h3>
         <ResponsiveContainer width="100%" height={220}>
@@ -475,7 +496,7 @@ function AnalyticsPage({ records }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+      <div className="two-col">
         <div className="card" style={{ padding:20 }}>
           <h3 style={{ fontWeight:700, marginBottom:16, fontSize:15 }}>מאזן חודשי</h3>
           <ResponsiveContainer width="100%" height={180}>
@@ -541,7 +562,7 @@ function SharingPage({ group, members, inviteMember, acceptInvite }) {
   }
 
   return (
-    <div style={{ padding:28, maxWidth:640 }}>
+    <div className="page-content">
       <h2 style={{ fontWeight:900, fontSize:24, marginBottom:22 }}>שיתוף מאגר</h2>
       <div className="card" style={{ padding:18, marginBottom:20 }}>
         <h3 style={{ fontWeight:700, marginBottom:14, fontSize:15 }}>חברי המאגר: {group?.name}</h3>
@@ -604,18 +625,23 @@ export default function FinanceApp() {
   const [page, setPage] = useState('dashboard')
   const data = useFinanceData()
 
-  if (data.loading) return <div style={{ display:'grid',placeItems:'center',height:'60vh',color:'var(--text-muted)' }}>טוען...</div>
+  if (data.loading) return (
+    <div style={{ display:'grid', placeItems:'center', height:'100%', color:'var(--text-muted)', flexDirection:'column', gap:12 }}>
+      <div style={{ fontSize:28 }}>₪</div>
+      <span style={{ fontSize:15 }}>טוען נתונים...</span>
+    </div>
+  )
 
   return (
-    <div style={{ display:'flex', height:'100%' }}>
-      <Sidebar page={page} setPage={setPage} groups={data.groups} group={data.group} setGroup={data.setGroup} />
-      <main style={{ flex:1, overflowY:'auto' }}>
+    <div className="app-layout" style={{ height:'100%' }}>
+      <main className="app-main">
         {page==='dashboard'  && <Dashboard records={data.records} />}
         {page==='records'    && <RecordsPage records={data.records} categories={data.categories} addRecord={data.addRecord} updateRecord={data.updateRecord} deleteRecord={data.deleteRecord} />}
         {page==='categories' && <CategoriesPage categories={data.categories} records={data.records} addCategory={data.addCategory} deleteCategory={data.deleteCategory} />}
         {page==='analytics'  && <AnalyticsPage records={data.records} />}
         {page==='sharing'    && <SharingPage group={data.group} members={data.members} inviteMember={data.inviteMember} acceptInvite={data.acceptInvite} />}
       </main>
+      <Sidebar page={page} setPage={setPage} groups={data.groups} group={data.group} setGroup={data.setGroup} />
     </div>
   )
 }
