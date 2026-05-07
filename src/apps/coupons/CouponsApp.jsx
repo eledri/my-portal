@@ -45,18 +45,15 @@ function parseCouponText(text) {
     if (m) { result.amount = m[1]; break }
   }
 
-  // תאריך תפוגה
+  // תאריך תפוגה — רק כאשר יש מילת מפתח מפורשת (לא מילוי אוטומטי של כל תאריך)
   const datePatterns = [
-    /(?:עד|valid until|expires?|תוקף עד)[:\s]+(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i,
-    /(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})/,
-    /(\d{4}-\d{2}-\d{2})/,
+    /(?:עד|valid until|expires?|תוקף עד|expiry|בתוקף עד)[:\s]+(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i,
+    /(?:עד|expires?)[:\s]+(\d{4}-\d{2}-\d{2})/i,
   ]
   for (const p of datePatterns) {
     const m = text.match(p)
     if (m) {
-      // Try to parse the date
       const raw = m[1]
-      // Convert DD/MM/YYYY to YYYY-MM-DD
       const parts = raw.split(/[\/\-.]/)
       if (parts.length === 3) {
         let [a, b, c] = parts
@@ -173,7 +170,7 @@ function CouponModal({ onSave, onClose, initial }) {
   }
 
   const save = async () => {
-    if (!name.trim() || !code.trim()) return setErr('יש למלא לפחות שם וקוד קופון')
+    if (!name.trim()) return setErr('יש למלא שם קופון')
     setSaving(true)
     const { error } = await onSave({
       name: name.trim(),
@@ -246,9 +243,9 @@ function CouponModal({ onSave, onClose, initial }) {
               <input className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="Amazon, Zara..." />
             </div>
             <div>
-              <label className="label">קוד קופון *</label>
+              <label className="label">קוד קופון</label>
               <input className="input" value={code} onChange={e=>setCode(e.target.value.toUpperCase())}
-                placeholder="SAVE20" style={{ fontFamily:'monospace', letterSpacing:1 }} />
+                placeholder="SAVE20 (אופציונלי)" style={{ fontFamily:'monospace', letterSpacing:1 }} />
             </div>
           </div>
 
@@ -304,25 +301,41 @@ function ExpandModal({ coupon, onClose, onCopy, copied }) {
         <h2 style={{ fontWeight:900, fontSize:24, marginBottom:6 }}>{coupon.name}</h2>
         {coupon.description && <p style={{ color:'var(--text-muted)', fontSize:15, marginBottom:16 }}>{coupon.description}</p>}
 
-        {/* קוד גדול */}
-        <div style={{
-          background:'var(--surface2)', border:'2px dashed var(--border2)',
-          borderRadius:12, padding:'20px 24px', margin:'0 0 20px',
-        }}>
-          <p style={{ fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>קוד הקופון</p>
-          <div style={{ fontFamily:'monospace', fontSize:32, fontWeight:900, letterSpacing:4, color:'var(--accent)', marginBottom:14 }}>
-            {coupon.code}
+        {/* סכום בולט */}
+        {coupon.amount != null && (
+          <div style={{
+            background:'rgba(5,150,105,0.08)', border:'1px solid rgba(5,150,105,0.2)',
+            borderRadius:12, padding:'14px 24px', margin:'0 0 16px',
+            display:'flex', alignItems:'baseline', justifyContent:'center', gap:4,
+          }}>
+            <span style={{ fontSize:16, color:'var(--green)', fontWeight:700 }}>₪</span>
+            <span style={{ fontSize:40, fontWeight:900, color:'var(--green)', lineHeight:1 }}>
+              {(+coupon.amount).toLocaleString()}
+            </span>
           </div>
-          <button className="btn btn-primary" onClick={() => onCopy(coupon.code, 'expand')}
-            style={{ width:'100%', padding:'12px', fontSize:16 }}>
-            {copied === 'expand' ? '✅ הועתק!' : '📋 העתק קוד'}
-          </button>
-        </div>
+        )}
 
-        <div style={{ display:'flex', justifyContent:'center', gap:24, fontSize:14, color:'var(--text-muted)' }}>
-          {coupon.amount && <span>💰 ₪{coupon.amount}</span>}
+        {/* קוד גדול — אם קיים */}
+        {coupon.code && (
+          <div style={{
+            background:'var(--surface2)', border:'2px dashed var(--border2)',
+            borderRadius:12, padding:'18px 24px', margin:'0 0 16px',
+          }}>
+            <p style={{ fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>קוד הקופון</p>
+            <div style={{ fontFamily:'monospace', fontSize:30, fontWeight:900, letterSpacing:4, color:'var(--accent)', marginBottom:14 }}>
+              {coupon.code}
+            </div>
+            <button className="btn btn-primary" onClick={() => onCopy(coupon.code, 'expand')}
+              style={{ width:'100%', padding:'12px', fontSize:16 }}>
+              {copied === 'expand' ? '✅ הועתק!' : '📋 העתק קוד'}
+            </button>
+          </div>
+        )}
+
+        {/* אתר + תאריך */}
+        <div style={{ display:'flex', justifyContent:'center', gap:16, fontSize:14, color:'var(--text-muted)', flexWrap:'wrap', marginBottom: coupon.url ? 12 : 0 }}>
           {coupon.expiry_date && (
-            <span style={{ color: isExpired ? 'var(--red)' : 'inherit' }}>
+            <span style={{ color: isExpired ? 'var(--red)' : 'var(--text-muted)' }}>
               📅 {isExpired ? 'פג תוקף' : 'עד'} {format(new Date(coupon.expiry_date), 'dd/MM/yyyy')}
             </span>
           )}
@@ -330,8 +343,14 @@ function ExpandModal({ coupon, onClose, onCopy, copied }) {
 
         {coupon.url && (
           <a href={coupon.url} target="_blank" rel="noopener noreferrer"
-            style={{ display:'block', marginTop:16, color:'var(--accent)', fontSize:14, textDecoration:'none' }}>
-            🔗 פתח אתר →
+            style={{
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+              background:'rgba(37,99,235,0.07)', border:'1px solid rgba(37,99,235,0.18)',
+              borderRadius:10, padding:'12px 20px', marginTop:4,
+              color:'var(--accent)', fontSize:15, fontWeight:700, textDecoration:'none',
+            }}>
+            🔗 {(() => { try { return new URL(coupon.url).hostname.replace('www.','') } catch { return 'פתח אתר' } })()}
+            <span style={{ fontSize:13, opacity:0.6 }}>↗</span>
           </a>
         )}
       </div>
@@ -342,7 +361,7 @@ function ExpandModal({ coupon, onClose, onCopy, copied }) {
 // ─────────────────────────────────────────────────────────────
 // Coupon Card
 // ─────────────────────────────────────────────────────────────
-function CouponCard({ coupon, onRedeem, onRestore, onEdit, onDelete, onExpand }) {
+function CouponCard({ coupon, brandColor, onRedeem, onRestore, onEdit, onDelete, onExpand }) {
   const { copy, copied } = useCopy()
   const isExpired = coupon.expiry_date && isPast(new Date(coupon.expiry_date + 'T23:59:59'))
   const daysLeft = coupon.expiry_date
@@ -356,8 +375,8 @@ function CouponCard({ coupon, onRedeem, onRestore, onEdit, onDelete, onExpand })
       padding:'16px', opacity: coupon.redeemed ? 0.7 : 1,
       position:'relative', overflow:'hidden',
     }}>
-      {/* פס עליון צבעוני */}
-      <div style={{ position:'absolute', top:0, right:0, left:0, height:3, background:'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
+      {/* פס עליון צבעוני לפי מותג */}
+      <div style={{ position:'absolute', top:0, right:0, left:0, height:3, background: brandColor?.bar || 'linear-gradient(90deg,#6366f1,#8b5cf6)' }} />
 
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
@@ -377,49 +396,81 @@ function CouponCard({ coupon, onRedeem, onRestore, onEdit, onDelete, onExpand })
         </div>
       </div>
 
-      {/* קוד קופון */}
-      <div style={{
-        background:'var(--surface2)', border:'1.5px dashed var(--border2)',
-        borderRadius:9, padding:'10px 14px', marginBottom:12,
-        display:'flex', alignItems:'center', justifyContent:'space-between', gap:8,
-      }}>
-        <span style={{ fontFamily:'monospace', fontSize:17, fontWeight:900, letterSpacing:2, color:'var(--accent)' }}>
-          {coupon.code}
-        </span>
-        <div style={{ display:'flex', gap:4 }}>
-          <button onClick={() => copy(coupon.code, coupon.id)}
-            className="btn" style={{
-              background: copied===coupon.id ? 'rgba(5,150,105,0.1)' : 'var(--surface)',
-              color: copied===coupon.id ? 'var(--green)' : 'var(--text-muted)',
-              border:'1px solid var(--border)', padding:'5px 10px', fontSize:12, gap:4,
-            }}>
-            {copied===coupon.id ? '✅ הועתק' : '📋 העתק'}
-          </button>
+      {/* קוד קופון — אופציונלי */}
+      {coupon.code ? (
+        <div style={{
+          background:'var(--surface2)', border:'1.5px dashed var(--border2)',
+          borderRadius:9, padding:'10px 14px', marginBottom:10,
+          display:'flex', alignItems:'center', justifyContent:'space-between', gap:8,
+        }}>
+          <span style={{ fontFamily:'monospace', fontSize:17, fontWeight:900, letterSpacing:2, color:'var(--accent)' }}>
+            {coupon.code}
+          </span>
+          <div style={{ display:'flex', gap:4 }}>
+            <button onClick={() => copy(coupon.code, coupon.id)}
+              className="btn" style={{
+                background: copied===coupon.id ? 'rgba(5,150,105,0.1)' : 'var(--surface)',
+                color: copied===coupon.id ? 'var(--green)' : 'var(--text-muted)',
+                border:'1px solid var(--border)', padding:'5px 10px', fontSize:12, gap:4,
+              }}>
+              {copied===coupon.id ? '✅ הועתק' : '📋 העתק'}
+            </button>
+            <button onClick={() => onExpand(coupon)}
+              className="btn" style={{
+                background:'var(--surface)', color:'var(--text-muted)',
+                border:'1px solid var(--border)', padding:'5px 9px', fontSize:13,
+              }} title="הגדל לצפייה">🔍</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom:10, display:'flex', justifyContent:'flex-end' }}>
           <button onClick={() => onExpand(coupon)}
             className="btn" style={{
-              background:'var(--surface)', color:'var(--text-muted)',
-              border:'1px solid var(--border)', padding:'5px 9px', fontSize:13,
-            }} title="הגדל לצפייה">🔍</button>
+              background:'var(--surface2)', color:'var(--text-muted)',
+              border:'1px solid var(--border)', padding:'5px 10px', fontSize:12,
+            }} title="הגדל לצפייה">🔍 פרטים</button>
         </div>
-      </div>
+      )}
 
-      {/* Meta info */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
-        <div style={{ display:'flex', gap:14, fontSize:13, flexWrap:'wrap' }}>
-          {coupon.amount != null && (
-            <span style={{ fontWeight:700, color:'var(--green)' }}>₪{(+coupon.amount).toLocaleString()}</span>
-          )}
-          {coupon.expiry_date && (
-            <span style={{ color: expiryColor, fontSize:12 }}>
-              📅 {isExpired ? 'פג' : daysLeft <= 7 ? `נותרו ${daysLeft} ימים` : `עד ${format(new Date(coupon.expiry_date),'dd/MM/yy')}`}
-            </span>
-          )}
+      {/* סכום בולט */}
+      {(coupon.amount != null || coupon.expiry_date || coupon.url) && (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8, marginBottom:10 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+            {coupon.amount != null && (
+              <div style={{
+                background:'rgba(5,150,105,0.08)', border:'1px solid rgba(5,150,105,0.2)',
+                borderRadius:8, padding:'6px 14px',
+                display:'flex', alignItems:'baseline', gap:3,
+              }}>
+                <span style={{ fontSize:11, color:'var(--green)', fontWeight:700 }}>₪</span>
+                <span style={{ fontSize:22, fontWeight:900, color:'var(--green)', lineHeight:1 }}>
+                  {(+coupon.amount).toLocaleString()}
+                </span>
+              </div>
+            )}
+            {coupon.expiry_date && (
+              <span style={{ color: expiryColor, fontSize:12, fontWeight:600 }}>
+                📅 {isExpired ? 'פג תוקף' : daysLeft <= 7 ? `נותרו ${daysLeft} ימים` : `עד ${format(new Date(coupon.expiry_date),'dd/MM/yy')}`}
+              </span>
+            )}
+          </div>
           {coupon.url && (
             <a href={coupon.url} target="_blank" rel="noopener noreferrer"
-              style={{ color:'var(--accent)', fontSize:12, textDecoration:'none' }}>🔗 אתר</a>
+              style={{
+                display:'inline-flex', alignItems:'center', gap:5,
+                background:'rgba(37,99,235,0.07)', border:'1px solid rgba(37,99,235,0.18)',
+                borderRadius:7, padding:'5px 12px',
+                color:'var(--accent)', fontSize:12, fontWeight:700, textDecoration:'none',
+                whiteSpace:'nowrap',
+              }}>
+              🔗 {(() => { try { return new URL(coupon.url).hostname.replace('www.','') } catch { return 'פתח אתר' } })()}
+            </a>
           )}
         </div>
+      )}
 
+      {/* Actions */}
+      <div style={{ display:'flex', justifyContent:'flex-end' }}>
         {coupon.redeemed ? (
           <button onClick={() => onRestore(coupon.id)}
             className="btn" style={{ padding:'6px 12px', fontSize:12, background:'var(--surface2)', color:'var(--text-muted)', border:'1px solid var(--border)' }}>
@@ -439,11 +490,35 @@ function CouponCard({ coupon, onRedeem, onRestore, onEdit, onDelete, onExpand })
 // ─────────────────────────────────────────────────────────────
 // Group coupons by name (first word = brand)
 // ─────────────────────────────────────────────────────────────
+// פלטת צבעים יפה לקטגוריות
+const BRAND_COLORS = [
+  { bg:'rgba(99,102,241,0.08)',  border:'rgba(99,102,241,0.25)',  text:'#6366f1',  bar:'linear-gradient(90deg,#6366f1,#8b5cf6)' },
+  { bg:'rgba(236,72,153,0.08)', border:'rgba(236,72,153,0.25)', text:'#ec4899',  bar:'linear-gradient(90deg,#ec4899,#f43f5e)' },
+  { bg:'rgba(245,158,11,0.08)', border:'rgba(245,158,11,0.25)', text:'#d97706',  bar:'linear-gradient(90deg,#f59e0b,#d97706)' },
+  { bg:'rgba(16,185,129,0.08)', border:'rgba(16,185,129,0.25)', text:'#059669',  bar:'linear-gradient(90deg,#10b981,#059669)' },
+  { bg:'rgba(59,130,246,0.08)', border:'rgba(59,130,246,0.25)', text:'#2563eb',  bar:'linear-gradient(90deg,#3b82f6,#2563eb)' },
+  { bg:'rgba(239,68,68,0.08)',  border:'rgba(239,68,68,0.25)',  text:'#dc2626',  bar:'linear-gradient(90deg,#ef4444,#dc2626)' },
+  { bg:'rgba(20,184,166,0.08)', border:'rgba(20,184,166,0.25)', text:'#0d9488',  bar:'linear-gradient(90deg,#14b8a6,#0d9488)' },
+  { bg:'rgba(249,115,22,0.08)', border:'rgba(249,115,22,0.25)', text:'#ea580c',  bar:'linear-gradient(90deg,#f97316,#ea580c)' },
+  { bg:'rgba(139,92,246,0.08)', border:'rgba(139,92,246,0.25)', text:'#7c3aed',  bar:'linear-gradient(90deg,#8b5cf6,#7c3aed)' },
+  { bg:'rgba(6,182,212,0.08)',  border:'rgba(6,182,212,0.25)',  text:'#0891b2',  bar:'linear-gradient(90deg,#06b6d4,#0891b2)' },
+  { bg:'rgba(132,204,22,0.08)', border:'rgba(132,204,22,0.25)', text:'#65a30d',  bar:'linear-gradient(90deg,#84cc16,#65a30d)' },
+  { bg:'rgba(168,85,247,0.08)', border:'rgba(168,85,247,0.25)', text:'#9333ea',  bar:'linear-gradient(90deg,#a855f7,#9333ea)' },
+]
+
 function groupByBrand(coupons) {
   const map = {}
+  let colorIdx = 0
   coupons.forEach(c => {
     const brand = c.name.split(/[\s\-_]/)[0].toLowerCase()
-    if (!map[brand]) map[brand] = { label: c.name.split(/[\s\-_]/)[0], items: [] }
+    if (!map[brand]) {
+      map[brand] = {
+        label: c.name.split(/[\s\-_]/)[0],
+        color: BRAND_COLORS[colorIdx % BRAND_COLORS.length],
+        items: []
+      }
+      colorIdx++
+    }
     map[brand].items.push(c)
   })
   return Object.values(map).sort((a,b) => b.items.length - a.items.length)
@@ -460,7 +535,7 @@ export default function CouponsApp({ activePage, onPageChange }) {
   const [expanded, setExpanded] = useState(null)
   const [search, setSearch]   = useState('')
   const [amountFilter, setAmountFilter] = useState('')
-  const [grouped, setGrouped] = useState(false)
+  const [grouped, setGrouped] = useState(true)
 
   const filtered = useMemo(() => {
     let list = coupons.filter(c => tab === 'active' ? !c.redeemed : c.redeemed)
@@ -563,18 +638,32 @@ export default function CouponsApp({ activePage, onPageChange }) {
 
       {/* Grouped view */}
       {grouped && filtered.length > 0 && (
-        <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:22 }}>
           {groups.map(group => (
             <div key={group.label}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                <h3 style={{ fontWeight:800, fontSize:16 }}>{group.label}</h3>
-                <span className="badge" style={{ background:'var(--surface2)', color:'var(--text-muted)', border:'1px solid var(--border)' }}>
+              {/* כותרת קטגוריה עם צבע */}
+              <div style={{
+                display:'flex', alignItems:'center', gap:10, marginBottom:12,
+                padding:'10px 14px',
+                background: group.color.bg,
+                border: `1px solid ${group.color.border}`,
+                borderRadius:10,
+                borderRight: `4px solid ${group.color.text}`,
+              }}>
+                <h3 style={{ fontWeight:800, fontSize:16, color: group.color.text, margin:0 }}>
+                  {group.label}
+                </h3>
+                <span style={{
+                  background: group.color.border, color: group.color.text,
+                  borderRadius:99, padding:'1px 9px', fontSize:11, fontWeight:800,
+                }}>
                   {group.items.length}
                 </span>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px,1fr))', gap:12 }}>
                 {group.items.map(c => (
                   <CouponCard key={c.id} coupon={c}
+                    brandColor={group.color}
                     onRedeem={redeem} onRestore={restore}
                     onEdit={c => { setEditing(c); setModal(true) }}
                     onDelete={id => confirm('למחוק קופון זה?') && remove(id)}

@@ -310,28 +310,48 @@ function PolicyCard({ policy, onEdit, onDelete, uploadDocument, deleteDocument, 
         <div style={{ height:3, background: policy.ins_categories.color }} />
       )}
       <div style={{ padding:20 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <div style={{
-              width:44, height:44, borderRadius:12, fontSize:22,
-              background: policy.ins_categories ? `${policy.ins_categories.color}20` : 'var(--surface2)',
-              display:'grid', placeItems:'center',
-            }}>
-              {policy.ins_categories?.icon || '🛡️'}
-            </div>
-            <div>
-              <h3 style={{ fontWeight:800, fontSize:17, marginBottom:2 }}>{policy.company_name}</h3>
-              <div style={{ fontSize:12, color:'var(--text-muted)' }}>
-                {policy.ins_categories?.name || 'ללא קטגוריה'}
-                {policy.policy_number && ` • פוליסה: ${policy.policy_number}`}
-                {policy.vehicle_number && ` • רכב: ${policy.vehicle_number}`}
+        {/* שורה עליונה: מספר רכב בולט + פעולות */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            {/* מספר רכב — בולט ממש בראש */}
+            {policy.vehicle_number ? (
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                <span style={{ fontSize:16 }}>🚗</span>
+                <span style={{
+                  fontFamily:'monospace', fontWeight:900,
+                  fontSize:22, letterSpacing:1, color:'var(--text)',
+                }}>
+                  {policy.vehicle_number}
+                </span>
+              </div>
+            ) : null}
+
+            {/* חברת ביטוח + קטגוריה */}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{
+                width:34, height:34, borderRadius:9, fontSize:18, flexShrink:0,
+                background: policy.ins_categories ? `${policy.ins_categories.color}20` : 'var(--surface2)',
+                display:'grid', placeItems:'center',
+              }}>
+                {policy.ins_categories?.icon || '🛡️'}
+              </div>
+              <div>
+                <h3 style={{ fontWeight:800, fontSize:16, margin:0, lineHeight:1.2 }}>{policy.company_name}</h3>
+                <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>
+                  {policy.ins_categories?.name || 'ללא קטגוריה'}
+                  {policy.policy_number && ` • פוליסה: ${policy.policy_number}`}
+                </div>
               </div>
             </div>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <span className="badge" style={{ background: status.bg, color: status.color }}>{status.label}</span>
-            <button onClick={() => onEdit(policy)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:16 }}>✏️</button>
-            <button onClick={() => confirm('למחוק ביטוח זה?') && onDelete(policy.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:16 }}>🗑️</button>
+
+          {/* פעולות + סטטוס */}
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:8, flexShrink:0, marginRight:4 }}>
+            <div style={{ display:'flex', gap:4 }}>
+              <button onClick={() => onEdit(policy)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:16,padding:2 }}>✏️</button>
+              <button onClick={() => confirm('למחוק ביטוח זה?') && onDelete(policy.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:16,padding:2 }}>🗑️</button>
+            </div>
+            <span className="badge" style={{ background: status.bg, color: status.color, fontSize:11 }}>{status.label}</span>
           </div>
         </div>
 
