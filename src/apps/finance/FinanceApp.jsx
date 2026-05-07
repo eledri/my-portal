@@ -11,35 +11,38 @@ const ICONS  = ['📁','💰','💸','🏠','🚗','🛒','🎬','💊','✈️'
 // ── hooks ──────────────────────────────────────────────────────────────────
 function useFinanceData() {
   const { user } = useAuth()
-  const [group, setGroup]       = useState(null)
-  const [groups, setGroups]     = useState([])
+  const [group, setGroup]           = useState(null)
+  const [groups, setGroups]         = useState([])
   const [categories, setCategories] = useState([])
-  const [records, setRecords]   = useState([])
-  const [members, setMembers]   = useState([])
-  const [loading, setLoading]   = useState(true)
+  const [records, setRecords]       = useState([])
+  const [members, setMembers]       = useState([])
+  const [loading, setLoading]       = useState(true)
 
-  const fetchGroups = useCallback(async () => {
-    if (!user) return
-    const { data } = await supabase.from('fin_groups')
-      .select('*, fin_group_members!inner(role)')
-      .eq('fin_group_members.user_id', user.id)
-    if (data?.length) { setGroups(data); setGroup(g => g || data[0]) }
-  }, [user])
-
+  // קריאה אחת מהירה — קבוצה + נתונים במקביל
   const fetchAll = useCallback(async () => {
-    if (!group) return
+    if (!user) return
+    const { data: groupsData } = await supabase
+      .from('fin_groups')
+      .select('*, fin_group_members!inner(role, user_id)')
+      .eq('fin_group_members.user_id', user.id)
+
+    if (!groupsData?.length) { setLoading(false); return }
+
+    const firstGroup = groupsData[0]
+    setGroups(groupsData)
+    setGroup(g => g || firstGroup)
+
     const [cats, recs, mems] = await Promise.all([
-      supabase.from('fin_categories').select('*').eq('group_id', group.id).order('name'),
-      supabase.from('fin_records').select('*, fin_categories(name,color,icon)').eq('group_id', group.id).order('date', { ascending: false }),
-      supabase.from('fin_group_members').select('*, users:user_id(email)').eq('group_id', group.id),
+      supabase.from('fin_categories').select('*').eq('group_id', firstGroup.id).order('name'),
+      supabase.from('fin_records').select('*, fin_categories(name,color,icon)').eq('group_id', firstGroup.id).order('date', { ascending: false }),
+      supabase.from('fin_group_members').select('*, users:user_id(email)').eq('group_id', firstGroup.id),
     ])
     setCategories(cats.data || [])
     setRecords(recs.data || [])
     setMembers(mems.data || [])
     setLoading(false)
-  }, [group])
+  }, [user])
 
-  useEffect(() => { fetchGroups() }, [fetchGroups])
   useEffect(() => { fetchAll() }, [fetchAll])
 
   const addCategory = async (d) => {
@@ -455,7 +458,7 @@ function AnalyticsPage({ records }) {
     return Object.values(m).filter(d=>d.value>0).sort((a,b)=>b.value-a.value)
   }, [records])
 
-  const tt = { contentStyle:{ background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,fontFamily:'Assistant',color:'var(--text)' } }
+  const tt = { contentStyle:{ background:'#fff',border:'1px solid var(--border)',borderRadius:8,fontFamily:'Assistant',color:'var(--text)',boxShadow:'0 4px 12px rgba(0,0,0,0.1)' } }
 
   return (
     <div style={{ padding:28, maxWidth:860 }}>

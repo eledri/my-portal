@@ -59,8 +59,8 @@ export default function PortalHome({ onOpenApp }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 38, height: 38, borderRadius: 10,
-            background: 'linear-gradient(135deg, #1e3a5f, #1a2a4a)',
-            border: '1px solid var(--border2)',
+            background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+            border: '1px solid rgba(37,99,235,0.3)',
             display: 'grid', placeItems: 'center', fontSize: 20,
           }}>{PORTAL_CONFIG.logo}</div>
           <span style={{ fontFamily: 'Heebo', fontWeight: 900, fontSize: 20 }}>

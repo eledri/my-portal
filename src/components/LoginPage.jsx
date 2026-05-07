@@ -36,12 +36,12 @@ export default function LoginPage() {
       {/* אור רקע */}
       <div style={{
         position: 'fixed', width: 700, height: 700, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(37,99,235,0.06) 0%, transparent 70%)',
         top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none',
       }} />
       <div style={{
         position: 'fixed', width: 500, height: 500, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(245,158,11,0.05) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(217,119,6,0.05) 0%, transparent 70%)',
         bottom: 0, right: '5%', pointerEvents: 'none',
       }} />
 
@@ -51,10 +51,10 @@ export default function LoginPage() {
           <div style={{
             display: 'inline-grid', placeItems: 'center',
             width: 74, height: 74, borderRadius: 20,
-            background: 'linear-gradient(135deg, #1e3a5f, #1a2a4a)',
-            border: '1px solid var(--border2)',
+            background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+            border: '1px solid rgba(37,99,235,0.3)',
             fontSize: 34, marginBottom: 18,
-            boxShadow: '0 0 50px rgba(59,130,246,0.18)',
+            boxShadow: '0 0 40px rgba(37,99,235,0.15)',
           }}>{PORTAL_CONFIG.logo}</div>
           <h1 style={{ fontSize: 30, fontWeight: 900, letterSpacing: '-0.5px', marginBottom: 6 }}>
             {portalName}

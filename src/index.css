@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --bg: #080b14;
-  --bg2: #0d1120;
-  --surface: #111827;
-  --surface2: #1a2236;
-  --surface3: #212d45;
-  --border: #263047;
-  --border2: #2e3a54;
-  --accent: #3b82f6;
-  --accent2: #60a5fa;
-  --accent-glow: rgba(59,130,246,0.15);
-  --gold: #f59e0b;
-  --gold-dim: rgba(245,158,11,0.12);
-  --green: #10b981;
-  --red: #ef4444;
-  --purple: #8b5cf6;
-  --text: #e2e8f0;
+  --bg: #f4f6f9;
+  --bg2: #eef0f5;
+  --surface: #ffffff;
+  --surface2: #f0f2f7;
+  --surface3: #e8ebf2;
+  --border: #dde1ec;
+  --border2: #c8cee0;
+  --accent: #2563eb;
+  --accent2: #1d4ed8;
+  --accent-glow: rgba(37,99,235,0.10);
+  --gold: #d97706;
+  --gold-dim: rgba(217,119,6,0.10);
+  --green: #059669;
+  --red: #dc2626;
+  --purple: #7c3aed;
+  --text: #0f172a;
   --text-muted: #64748b;
   --text-dim: #94a3b8;
   --radius: 14px;
@@ -27,9 +27,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body, #root {
-  height: 100%;
-}
+html, body, #root { height: 100%; }
 
 body {
   background: var(--bg);
@@ -41,21 +39,20 @@ body {
 
 h1,h2,h3,h4,h5 { font-family: 'Heebo', sans-serif; }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
 
-/* Components */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 
 .input {
   width: 100%;
-  background: var(--surface2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
@@ -71,6 +68,8 @@ h1,h2,h3,h4,h5 { font-family: 'Heebo', sans-serif; }
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 .input::placeholder { color: var(--text-muted); }
+
+select.input { background: var(--surface); }
 
 .label {
   display: block;
@@ -101,44 +100,37 @@ h1,h2,h3,h4,h5 { font-family: 'Heebo', sans-serif; }
   background: var(--accent);
   color: white;
 }
-.btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+.btn-primary:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.25); }
 .btn-ghost {
   background: transparent;
-  color: var(--text-dim);
+  color: var(--text-muted);
   border: 1px solid var(--border);
 }
-.btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
 .btn-danger {
-  background: rgba(239,68,68,0.1);
+  background: rgba(220,38,38,0.08);
   color: var(--red);
-  border: 1px solid rgba(239,68,68,0.2);
+  border: 1px solid rgba(220,38,38,0.2);
 }
-.btn-danger:hover { background: rgba(239,68,68,0.2); }
+.btn-danger:hover { background: rgba(220,38,38,0.15); }
 
-/* Animations */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fadeIn {
   from { opacity: 0; } to { opacity: 1; }
 }
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
-}
-.fade-up { animation: fadeUp 0.35s ease both; }
-.fade-in { animation: fadeIn 0.25s ease both; }
+.fade-up { animation: fadeUp 0.3s ease both; }
+.fade-in { animation: fadeIn 0.2s ease both; }
 
-/* Stagger children */
-.stagger > *:nth-child(1)  { animation-delay: 0.05s; }
-.stagger > *:nth-child(2)  { animation-delay: 0.10s; }
-.stagger > *:nth-child(3)  { animation-delay: 0.15s; }
-.stagger > *:nth-child(4)  { animation-delay: 0.20s; }
-.stagger > *:nth-child(5)  { animation-delay: 0.25s; }
-.stagger > *:nth-child(6)  { animation-delay: 0.30s; }
+.stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger > *:nth-child(4) { animation-delay: 0.16s; }
+.stagger > *:nth-child(5) { animation-delay: 0.20s; }
+.stagger > *:nth-child(6) { animation-delay: 0.24s; }
 
-/* Badge */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -148,12 +140,11 @@ h1,h2,h3,h4,h5 { font-family: 'Heebo', sans-serif; }
   font-weight: 700;
 }
 
-/* Modal overlay */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(15,23,42,0.45);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
