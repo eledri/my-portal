@@ -323,12 +323,151 @@ function RecordModal({ categories, onSave, onClose, initial }) {
   )
 }
 
+// ── Record Row (shared) ──────────────────────────────────────────────────────
+function RecordRow({ r, onEdit, onDelete }) {
+  return (
+    <>
+      {/* Desktop row */}
+      <tr className="record-row-desktop" onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+        <td style={{ color:'var(--text-muted)', fontSize:12 }}>{format(new Date(r.date),'dd/MM/yy')}</td>
+        <td style={{ fontWeight:600 }}>{r.title}</td>
+        <td style={{ color:'var(--text-muted)', fontSize:12 }}>{r.is_recurring ? `${r.installments_paid}/${r.installments_total}` : '—'}</td>
+        <td style={{ fontWeight:800, textAlign:'left', color: r.type==='income' ? 'var(--green)' : 'var(--red)' }}>
+          {r.type==='income' ? '+' : '-'}₪{(+r.amount).toLocaleString()}
+        </td>
+        <td>
+          <div style={{ display:'flex', gap:3 }}>
+            <button onClick={() => onEdit(r)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4 }}>✏️</button>
+            <button onClick={() => confirm('למחוק?') && onDelete(r.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4 }}>🗑️</button>
+          </div>
+        </td>
+      </tr>
+    </>
+  )
+}
+
+function RecordCard({ r, onEdit, onDelete }) {
+  return (
+    <div className="card" style={{ padding:'12px 14px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontWeight:700, fontSize:14, marginBottom:2 }}>{r.title}</div>
+          <div style={{ fontSize:12, color:'var(--text-muted)', display:'flex', gap:8, flexWrap:'wrap' }}>
+            <span>{format(new Date(r.date),'dd/MM/yy')}</span>
+            {r.is_recurring && <span>תשלום {r.installments_paid}/{r.installments_total}</span>}
+          </div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+          <span style={{ fontWeight:900, fontSize:15, color: r.type==='income' ? 'var(--green)' : 'var(--red)' }}>
+            {r.type==='income' ? '+' : '-'}₪{(+r.amount).toLocaleString()}
+          </span>
+          <button onClick={() => onEdit(r)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:3 }}>✏️</button>
+          <button onClick={() => confirm('למחוק?') && onDelete(r.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:3 }}>🗑️</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Category Accordion for Records ───────────────────────────────────────────
+function RecordsByCategory({ records, categories, onEdit, onDelete }) {
+  // קבץ לפי קטגוריה
+  const groups = useMemo(() => {
+    const map = {}
+    const noCat = records.filter(r => !r.category_id)
+    if (noCat.length) map['none'] = {
+      cat: { id:'none', name:'ללא קטגוריה', color:'#94a3b8', icon:'📋' },
+      items: noCat,
+      total: noCat.reduce((s,r) => s + (r.type==='income' ? +r.amount : -r.amount), 0)
+    }
+    categories.forEach(c => {
+      const items = records.filter(r => r.category_id === c.id)
+      if (items.length) map[c.id] = {
+        cat: c,
+        items,
+        total: items.reduce((s,r) => s + (r.type==='income' ? +r.amount : -r.amount), 0)
+      }
+    })
+    // קטגוריות שיש להן רשומות אבל לא נמצאות ב-categories (נמחקו)
+    const knownIds = new Set([...categories.map(c=>c.id), 'none'])
+    const orphans = records.filter(r => r.category_id && !knownIds.has(r.category_id))
+    if (orphans.length) map['other'] = {
+      cat: { id:'other', name:'קטגוריה אחרת', color:'#94a3b8', icon:'📂' },
+      items: orphans,
+      total: orphans.reduce((s,r) => s + (r.type==='income' ? +r.amount : -r.amount), 0)
+    }
+    return Object.values(map)
+  }, [records, categories])
+
+  const [open, setOpen] = useState(() => {
+    const init = {}
+    if (groups.length > 0) init[groups[0].cat.id] = true
+    return init
+  })
+  const toggle = id => setOpen(p => ({ ...p, [id]: !p[id] }))
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {groups.map(({ cat, items, total }) => {
+        const isOpen = !!open[cat.id]
+        const income  = items.filter(r=>r.type==='income').reduce((s,r)=>s+(+r.amount),0)
+        const expense = items.filter(r=>r.type==='expense').reduce((s,r)=>s+(+r.amount),0)
+        return (
+          <div key={cat.id} style={{ border:`1px solid ${cat.color}35`, borderRadius:12, overflow:'hidden' }}>
+            {/* כותרת accordion */}
+            <button onClick={() => toggle(cat.id)} style={{
+              width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+              padding:'11px 16px',
+              background: isOpen ? `${cat.color}0d` : 'var(--surface)',
+              border:'none', cursor:'pointer',
+              borderRight:`4px solid ${cat.color}`,
+              transition:'background 0.18s',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ fontSize:18 }}>{cat.icon}</span>
+                <span style={{ fontFamily:'Heebo', fontWeight:800, fontSize:15, color:cat.color }}>{cat.name}</span>
+                <span style={{ background:`${cat.color}18`, color:cat.color, border:`1px solid ${cat.color}28`, borderRadius:99, padding:'1px 8px', fontSize:11, fontWeight:800 }}>
+                  {items.length}
+                </span>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                {income > 0 && <span style={{ fontSize:12, fontWeight:700, color:'var(--green)' }}>+₪{income.toLocaleString()}</span>}
+                {expense > 0 && <span style={{ fontSize:12, fontWeight:700, color:'var(--red)' }}>-₪{expense.toLocaleString()}</span>}
+                <span style={{ fontSize:16, color:cat.color, transform: isOpen?'rotate(0)':'rotate(-90deg)', transition:'transform 0.2s', lineHeight:1 }}>▾</span>
+              </div>
+            </button>
+
+            {/* תוכן */}
+            {isOpen && (
+              <div style={{ background:'var(--bg)', borderTop:`1px solid ${cat.color}20`, padding:'10px 12px' }}>
+                {/* Desktop table */}
+                <div className="table-wrap" style={{ borderRadius:8, overflow:'hidden' }}>
+                  <table className="data-table" style={{ background:'var(--surface)' }}>
+                    <thead><tr>{['תאריך','כותרת','תשלומים','סכום',''].map((h,i)=>(
+                      <th key={i} style={{ textAlign:i===3?'left':'right', background:'var(--surface2)' }}>{h}</th>
+                    ))}</tr></thead>
+                    <tbody>{items.map(r => <RecordRow key={r.id} r={r} onEdit={onEdit} onDelete={onDelete} />)}</tbody>
+                  </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="record-cards" style={{ gap:6 }}>
+                  {items.map(r => <RecordCard key={r.id} r={r} onEdit={onEdit} onDelete={onDelete} />)}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Records Page ──────────────────────────────────────────────────────────────
 function RecordsPage({ records, categories, addRecord, updateRecord, deleteRecord }) {
-  const [modal, setModal]   = useState(false)
+  const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState(null)
-  const [ft, setFt]         = useState('all')
-  const [search, setSearch] = useState('')
+  const [ft, setFt]           = useState('all')
+  const [search, setSearch]   = useState('')
 
   const filtered = useMemo(() => {
     let l = [...records]
@@ -336,6 +475,9 @@ function RecordsPage({ records, categories, addRecord, updateRecord, deleteRecor
     if (search) l = l.filter(r => r.title.toLowerCase().includes(search.toLowerCase()))
     return l
   }, [records, ft, search])
+
+  const handleEdit = r => { setEditing(r); setModal(true) }
+  const handleDelete = id => confirm('למחוק?') && deleteRecord(id)
 
   return (
     <div className="page-content">
@@ -346,13 +488,14 @@ function RecordsPage({ records, categories, addRecord, updateRecord, deleteRecor
       </div>
 
       {/* Filters */}
-      <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
         <input className="input" style={{ flex:'1 1 140px', padding:'8px 12px', fontSize:14 }}
           placeholder="חיפוש..." value={search} onChange={e=>setSearch(e.target.value)} />
         <div style={{ display:'flex', gap:5 }}>
-          {[['all','הכל'],['income','💰'],['expense','💸']].map(([v,l]) => (
+          {[['all','הכל'],['income','💰 הכנסות'],['expense','💸 הוצאות']].map(([v,l]) => (
             <button key={v} onClick={() => setFt(v)} style={{
-              padding:'8px 12px', borderRadius:8, border:`1px solid ${ft===v ? 'var(--accent)' : 'var(--border)'}`,
+              padding:'8px 12px', borderRadius:8,
+              border:`1px solid ${ft===v ? 'var(--accent)' : 'var(--border)'}`,
               background: ft===v ? 'rgba(37,99,235,0.08)' : 'transparent',
               color: ft===v ? 'var(--accent)' : 'var(--text-muted)',
               cursor:'pointer', fontFamily:'Heebo', fontWeight:600, fontSize:13 }}>{l}</button>
@@ -362,64 +505,14 @@ function RecordsPage({ records, categories, addRecord, updateRecord, deleteRecor
 
       {filtered.length === 0 ? (
         <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text-muted)' }}>📭 אין רשומות</div>
-      ) : (<>
-        {/* Desktop table */}
-        <div className="card table-wrap" style={{ overflow:'hidden', padding:0 }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                {['תאריך','כותרת','קטגוריה','תשלומים','סכום',''].map((h,i) => (
-                  <th key={i} style={{ textAlign: i===4?'left':'right' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(r => (
-                <tr key={r.id} onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <td style={{ color:'var(--text-muted)', fontSize:12 }}>{format(new Date(r.date),'dd/MM/yy')}</td>
-                  <td style={{ fontWeight:600 }}>{r.title}</td>
-                  <td>{r.fin_categories ? <span className="badge" style={{ background:`${r.fin_categories.color}18`, color:r.fin_categories.color, border:`1px solid ${r.fin_categories.color}28` }}>{r.fin_categories.icon} {r.fin_categories.name}</span> : <span style={{ color:'var(--text-muted)' }}>—</span>}</td>
-                  <td style={{ color:'var(--text-muted)', fontSize:12 }}>{r.is_recurring ? `${r.installments_paid}/${r.installments_total}` : '—'}</td>
-                  <td style={{ fontWeight:800, textAlign:'left', color: r.type==='income' ? 'var(--green)' : 'var(--red)' }}>
-                    {r.type==='income' ? '+' : '-'}₪{(+r.amount).toLocaleString()}
-                  </td>
-                  <td>
-                    <div style={{ display:'flex', gap:3 }}>
-                      <button onClick={() => { setEditing(r); setModal(true) }} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4 }}>✏️</button>
-                      <button onClick={() => confirm('למחוק?') && deleteRecord(r.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,padding:4 }}>🗑️</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile cards */}
-        <div className="record-cards">
-          {filtered.map(r => (
-            <div key={r.id} className="card" style={{ padding:'14px 16px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{r.title}</div>
-                  <div style={{ fontSize:12, color:'var(--text-muted)', display:'flex', gap:8, flexWrap:'wrap' }}>
-                    <span>{format(new Date(r.date),'dd/MM/yy')}</span>
-                    {r.fin_categories && <span>{r.fin_categories.icon} {r.fin_categories.name}</span>}
-                    {r.is_recurring && <span>תשלום {r.installments_paid}/{r.installments_total}</span>}
-                  </div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-                  <span style={{ fontWeight:900, fontSize:16, color: r.type==='income' ? 'var(--green)' : 'var(--red)' }}>
-                    {r.type==='income' ? '+' : '-'}₪{(+r.amount).toLocaleString()}
-                  </span>
-                  <button onClick={() => { setEditing(r); setModal(true) }} style={{ background:'none',border:'none',cursor:'pointer',fontSize:16,padding:4 }}>✏️</button>
-                  <button onClick={() => confirm('למחוק?') && deleteRecord(r.id)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:16,padding:4 }}>🗑️</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </>)}
+      ) : (
+        <RecordsByCategory
+          records={filtered}
+          categories={categories}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      )}
 
       {modal && <RecordModal categories={categories} initial={editing}
         onSave={d => editing ? updateRecord(editing.id, d) : addRecord(d)}
