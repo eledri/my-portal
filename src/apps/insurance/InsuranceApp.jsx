@@ -130,6 +130,8 @@ function PolicyModal({ categories, onSave, onClose, initial }) {
   const [err, setErr]             = useState('')
 
   const total = (+costMandatory || 0) + (+costComprehensive || 0)
+  const selectedCat = categories.find(c => c.id === catId)
+  const isCar = isCarCategory(selectedCat)
 
   const save = async () => {
     if (!company.trim()) return setErr('יש למלא שם חברה')
@@ -176,7 +178,7 @@ function PolicyModal({ categories, onSave, onClose, initial }) {
             </div>
           </div>
           {/* מספר רכב — רק לקטגוריית רכב */}
-          {isCarCategory(categories.find(c => c.id === catId)) && (
+          {isCar && (
             <div>
               <label className="label">מספר רכב</label>
               <input className="input" value={vehicleNum} onChange={e=>setVehicleNum(e.target.value)} placeholder="12-345-67" />
@@ -197,7 +199,7 @@ function PolicyModal({ categories, onSave, onClose, initial }) {
           {/* עלויות */}
           <div style={{ background:'var(--surface2)', borderRadius:12, padding:16, border:'1px solid var(--border)' }}>
             <div style={{ fontSize:12, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:12 }}>עלויות</div>
-            {isCarCategory(categories.find(c => c.id === catId)) ? (
+            {isCar ? (
               // רכב — חובה + מקיף
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
                 <div>
@@ -210,16 +212,31 @@ function PolicyModal({ categories, onSave, onClose, initial }) {
                 </div>
               </div>
             ) : (
-              // שאר הקטגוריות — עלות כוללת בלבד
+              // שאר הקטגוריות — פרמייה חודשית
               <div style={{ marginBottom:12 }}>
-                <label className="label">עלות שנתית (₪)</label>
+                <label className="label">פרמייה חודשית (₪)</label>
                 <input className="input" type="number" value={costMandatory} onChange={e=>setCostMandatory(e.target.value)} placeholder="0" />
               </div>
             )}
             {total > 0 && (
-              <div style={{ display:'flex', justifyContent:'space-between', background:'var(--surface)', borderRadius:8, padding:'10px 14px', border:'1px solid var(--border)' }}>
-                <span style={{ fontWeight:600, fontSize:14 }}>סה"כ</span>
-                <span style={{ fontWeight:900, fontSize:16, color:'var(--accent2)' }}>₪{total.toLocaleString()}</span>
+              <div style={{ display:'flex', flexDirection:'column', gap:6, background:'var(--surface)', borderRadius:8, padding:'10px 14px', border:'1px solid var(--border)' }}>
+                {isCar ? (
+                  <div style={{ display:'flex', justifyContent:'space-between' }}>
+                    <span style={{ fontWeight:600, fontSize:14 }}>סה"כ שנתי</span>
+                    <span style={{ fontWeight:900, fontSize:16, color:'var(--accent2)' }}>₪{total.toLocaleString()}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display:'flex', justifyContent:'space-between' }}>
+                      <span style={{ fontWeight:600, fontSize:14 }}>חודשי</span>
+                      <span style={{ fontWeight:900, fontSize:16, color:'var(--accent2)' }}>₪{total.toLocaleString()}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid var(--border)', paddingTop:6 }}>
+                      <span style={{ fontSize:13, color:'var(--text-muted)' }}>שנתי (×12)</span>
+                      <span style={{ fontWeight:700, fontSize:14, color:'var(--text-muted)' }}>₪{(total*12).toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -376,25 +393,39 @@ function PolicyCard({ policy, onEdit, onDelete, uploadDocument, deleteDocument, 
         </div>
 
         {/* Info grid */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
-          {[
+        {(() => {
+          // רכב = לפי קטגוריה OR אם יש cost_comprehensive (נתון ישן)
+          const isCar = isCarCategory(policy.ins_categories) || !!policy.cost_comprehensive
+          const fields = isCar ? [
             { label:'התחלה', value: policy.start_date ? format(new Date(policy.start_date),'dd/MM/yyyy') : '—' },
             { label:'סיום',  value: policy.end_date   ? format(new Date(policy.end_date),'dd/MM/yyyy') : '—' },
             { label:'חובה',  value: fmt(policy.cost_mandatory) },
             { label:'מקיף',  value: fmt(policy.cost_comprehensive) },
-          ].map(({ label, value }) => (
-            <div key={label} style={{ background:'var(--surface2)', borderRadius:8, padding:'10px 12px' }}>
-              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>{label}</div>
-              <div style={{ fontWeight:700, fontSize:14 }}>{value}</div>
+          ] : [
+            { label:'התחלה',         value: policy.start_date ? format(new Date(policy.start_date),'dd/MM/yyyy') : '—' },
+            { label:'סיום',          value: policy.end_date   ? format(new Date(policy.end_date),'dd/MM/yyyy') : '—' },
+            { label:'פרמייה חודשית', value: fmt(policy.cost_mandatory) },
+            { label:'שנתי (×12)',    value: policy.cost_mandatory ? fmt(+policy.cost_mandatory * 12) : '—' },
+          ]
+          return (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
+              {fields.map(({ label, value }) => (
+                <div key={label} style={{ background:'var(--surface2)', borderRadius:8, padding:'10px 12px' }}>
+                  <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>{label}</div>
+                  <div style={{ fontWeight:700, fontSize:14 }}>{value}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )
+        })()}
 
         {/* Total */}
         {policy.total_cost > 0 && (
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
             background:'var(--surface2)', borderRadius:8, padding:'10px 14px', marginBottom:14, border:'1px solid var(--border)' }}>
-            <span style={{ fontWeight:600, fontSize:13 }}>סה"כ עלות</span>
+            <span style={{ fontWeight:600, fontSize:13 }}>
+              {(isCarCategory(policy.ins_categories) || !!policy.cost_comprehensive) ? 'סה"כ שנתי' : 'פרמייה חודשית'}
+            </span>
             <span style={{ fontWeight:900, fontSize:18, color:'var(--accent2)' }}>₪{(+policy.total_cost).toLocaleString()}</span>
           </div>
         )}
