@@ -32,26 +32,28 @@ function useFinanceData() {
 
   const fetchAll = useCallback(async () => {
     if (!user) return
+    console.log('[fetchAll] user=', user.id)
 
-    // שלב 1: מצא את ה-group_ids של המשתמש
-    const { data: memberships } = await supabase
+    const { data: memberships, error: memErr } = await supabase
       .from('fin_group_members')
       .select('group_id, role')
       .eq('user_id', user.id)
 
+    console.log('[fetchAll] memberships=', memberships, 'error=', memErr)
     if (!memberships?.length) { setLoading(false); return }
 
     const groupIds = memberships.map(m => m.group_id)
 
-    // שלב 2: קבל את הקבוצות
-    const { data: groupsData } = await supabase
+    const { data: groupsData, error: grpErr } = await supabase
       .from('fin_groups')
       .select('*')
       .in('id', groupIds)
 
+    console.log('[fetchAll] groupsData=', groupsData, 'error=', grpErr)
     if (!groupsData?.length) { setLoading(false); return }
 
     const first = groupsData[0]
+    console.log('[fetchAll] setting groupId=', first.id)
     setGroups(groupsData)
     setGroup(first)
     setGroupId(first.id)
