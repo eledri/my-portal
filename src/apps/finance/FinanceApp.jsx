@@ -190,7 +190,7 @@ function Dashboard({ records }) {
       if (!m[k]) m[k] = { name: r.fin_categories?.name || '—', color: r.fin_categories?.color || '#666', icon: r.fin_categories?.icon || '📁', total: 0 }
       m[k].total += +r.amount
     })
-    return Object.values(m).sort((a,b) => b.total - a.total).slice(0,5)
+    return Object.values(m).sort((a,b) => b.total - a.total)
   }, [month])
 
   const Stat = ({ label, val, color, icon }) => (
