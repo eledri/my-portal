@@ -83,8 +83,12 @@ function useInsuranceData() {
   }
 
   const getDocumentUrl = async (storagePath) => {
-    const { data } = await supabase.storage.from('insurance-docs').createSignedUrl(storagePath, 3600)
-    return data?.signedUrl
+    // נסה signed URL קודם
+    const { data, error } = await supabase.storage
+      .from('insurance-docs')
+      .createSignedUrl(storagePath, 3600)
+    if (data?.signedUrl) return { url: data.signedUrl, error: null }
+    return { url: null, error: error?.message || 'שגיאה ביצירת קישור' }
   }
 
   return { categories, policies, loading, addCategory, deleteCategory, addPolicy, updatePolicy, deletePolicy, uploadDocument, deleteDocument, getDocumentUrl }
@@ -232,13 +236,14 @@ function DocumentsSection({ policy, uploadDocument, deleteDocument, getDocumentU
 
   const download = async (doc) => {
     setDownloading(doc.id)
-    const url = await getDocumentUrl(doc.storage_path)
+    const { url, error } = await getDocumentUrl(doc.storage_path)
     setDownloading(null)
-    if (url) {
-      const a = document.createElement('a')
-      a.href = url; a.download = doc.filename; a.target = '_blank'
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    if (error || !url) {
+      alert('שגיאה בהורדה: ' + (error || 'קישור לא נוצר'))
+      return
     }
+    // פתח בטאב חדש (עובד בכל דפדפן כולל מובייל)
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const docs = policy.ins_documents || []
@@ -280,8 +285,8 @@ function DocumentsSection({ policy, uploadDocument, deleteDocument, getDocumentU
                 <div style={{ fontSize:11, color:'var(--text-muted)' }}>{fmtSize(doc.size)}</div>
               </div>
               <button onClick={() => download(doc)} disabled={downloading === doc.id}
-                style={{ background:'var(--accent-glow)',border:'1px solid var(--border)',borderRadius:6,padding:'5px 10px',color:'var(--accent2)',cursor:'pointer',fontSize:12,fontWeight:700 }}>
-                {downloading === doc.id ? '...' : '⬇ הורד'}
+                style={{ background:'var(--accent-glow)',border:'1px solid var(--border)',borderRadius:6,padding:'5px 10px',color:'var(--accent)',cursor:'pointer',fontSize:12,fontWeight:700,opacity:downloading===doc.id?0.6:1 }}>
+                {downloading === doc.id ? '⏳ טוען...' : '⬇ הורד'}
               </button>
               <button onClick={() => confirm('למחוק מסמך זה?') && deleteDocument(doc, policy.id)}
                 style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',fontSize:15 }}>✕</button>

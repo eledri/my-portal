@@ -233,3 +233,33 @@ CREATE TABLE coupons (
 ALTER TABLE coupons ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "coupons_own" ON coupons FOR ALL USING (user_id = auth.uid());
 
+
+-- ════════════════════════════════════════════════════════════
+-- תיקון Storage Policies — הרץ אם יש בעיות הורדה
+-- ════════════════════════════════════════════════════════════
+
+-- מחק policies ישנים ויצור חדשים נכונים
+DROP POLICY IF EXISTS "users can upload own docs" ON storage.objects;
+DROP POLICY IF EXISTS "users can view own docs" ON storage.objects;
+DROP POLICY IF EXISTS "users can delete own docs" ON storage.objects;
+
+CREATE POLICY "insurance upload"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'insurance-docs' AND
+    auth.uid()::text = (string_to_array(name, '/'))[1]
+  );
+
+CREATE POLICY "insurance select"
+  ON storage.objects FOR SELECT
+  USING (
+    bucket_id = 'insurance-docs' AND
+    auth.uid()::text = (string_to_array(name, '/'))[1]
+  );
+
+CREATE POLICY "insurance delete"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'insurance-docs' AND
+    auth.uid()::text = (string_to_array(name, '/'))[1]
+  );
