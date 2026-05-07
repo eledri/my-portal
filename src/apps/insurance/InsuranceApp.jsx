@@ -108,6 +108,13 @@ function fmt(n) { return n ? `₪${(+n).toLocaleString()}` : '—' }
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#f97316']
 const ICONS  = ['🛡️','🚗','🏠','❤️','✈️','📋','🏥','🔑','💼','🌊']
 
+// האם קטגוריה היא ביטוח רכב (לפי שם או אייקון)
+const isCarCategory = (cat) => {
+  if (!cat) return false
+  const name = cat.name?.toLowerCase() || ''
+  return cat.icon === '🚗' || name.includes('רכב') || name.includes('car') || name.includes('auto')
+}
+
 // ── Policy Modal ──────────────────────────────────────────────────────────────
 function PolicyModal({ categories, onSave, onClose, initial }) {
   const [catId, setCatId]         = useState(initial?.category_id || '')
@@ -168,10 +175,14 @@ function PolicyModal({ categories, onSave, onClose, initial }) {
               <input className="input" value={policyNum} onChange={e=>setPolicyNum(e.target.value)} placeholder="12345678" />
             </div>
           </div>
-          <div>
-            <label className="label">מספר רכב (אם רלוונטי)</label>
-            <input className="input" value={vehicleNum} onChange={e=>setVehicleNum(e.target.value)} placeholder="12-345-67" />
-          </div>
+          {/* מספר רכב — רק לקטגוריית רכב */}
+          {isCarCategory(categories.find(c => c.id === catId)) && (
+            <div>
+              <label className="label">מספר רכב</label>
+              <input className="input" value={vehicleNum} onChange={e=>setVehicleNum(e.target.value)} placeholder="12-345-67" />
+            </div>
+          )}
+
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
             <div>
               <label className="label">תאריך התחלה</label>
@@ -183,19 +194,28 @@ function PolicyModal({ categories, onSave, onClose, initial }) {
             </div>
           </div>
 
-          {/* Costs */}
+          {/* עלויות */}
           <div style={{ background:'var(--surface2)', borderRadius:12, padding:16, border:'1px solid var(--border)' }}>
             <div style={{ fontSize:12, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:12 }}>עלויות</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
-              <div>
-                <label className="label">עלות חובה (₪)</label>
+            {isCarCategory(categories.find(c => c.id === catId)) ? (
+              // רכב — חובה + מקיף
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+                <div>
+                  <label className="label">עלות חובה (₪)</label>
+                  <input className="input" type="number" value={costMandatory} onChange={e=>setCostMandatory(e.target.value)} placeholder="0" />
+                </div>
+                <div>
+                  <label className="label">עלות מקיף (₪)</label>
+                  <input className="input" type="number" value={costComprehensive} onChange={e=>setCostComprehensive(e.target.value)} placeholder="0" />
+                </div>
+              </div>
+            ) : (
+              // שאר הקטגוריות — עלות כוללת בלבד
+              <div style={{ marginBottom:12 }}>
+                <label className="label">עלות שנתית (₪)</label>
                 <input className="input" type="number" value={costMandatory} onChange={e=>setCostMandatory(e.target.value)} placeholder="0" />
               </div>
-              <div>
-                <label className="label">עלות מקיף (₪)</label>
-                <input className="input" type="number" value={costComprehensive} onChange={e=>setCostComprehensive(e.target.value)} placeholder="0" />
-              </div>
-            </div>
+            )}
             {total > 0 && (
               <div style={{ display:'flex', justifyContent:'space-between', background:'var(--surface)', borderRadius:8, padding:'10px 14px', border:'1px solid var(--border)' }}>
                 <span style={{ fontWeight:600, fontSize:14 }}>סה"כ</span>
@@ -495,6 +515,95 @@ function SummaryBar({ policies }) {
   )
 }
 
+// ── Policy Accordion ─────────────────────────────────────────────────────────
+function PolicyAccordion({ policies, categories, onEdit, onDelete, uploadDocument, deleteDocument, getDocumentUrl }) {
+  // קבץ לפי קטגוריה
+  const groups = useMemo(() => {
+    const map = {}
+    // קבוצת "ללא קטגוריה"
+    const noCat = policies.filter(p => !p.category_id)
+    if (noCat.length) map['none'] = { cat: { id:'none', name:'ללא קטגוריה', color:'#94a3b8', icon:'📋' }, items: noCat }
+    // קטגוריות עם פוליסות
+    categories.forEach(c => {
+      const items = policies.filter(p => p.category_id === c.id)
+      if (items.length) map[c.id] = { cat: c, items }
+    })
+    return Object.values(map)
+  }, [policies, categories])
+
+  // הקבוצה הראשונה פתוחה כברירת מחדל
+  const [open, setOpen] = useState(() => {
+    const init = {}
+    if (groups.length > 0) init[groups[0].cat.id] = true
+    return init
+  })
+
+  const toggle = (id) => setOpen(prev => ({ ...prev, [id]: !prev[id] }))
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {groups.map(({ cat, items }) => {
+        const isOpen = !!open[cat.id]
+        const catTotal = items.reduce((s,p) => s+(+p.total_cost||0), 0)
+        return (
+          <div key={cat.id} style={{
+            border: `1px solid ${cat.color}40`,
+            borderRadius:12, overflow:'hidden',
+          }}>
+            {/* כותרת — לחיצה לפתיחה/סגירה */}
+            <button onClick={() => toggle(cat.id)} style={{
+              width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+              padding:'12px 16px',
+              background: isOpen ? `${cat.color}10` : 'var(--surface)',
+              border:'none', cursor:'pointer',
+              borderRight:`4px solid ${cat.color}`,
+              transition:'background 0.18s',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ fontSize:20 }}>{cat.icon}</span>
+                <span style={{ fontFamily:'Heebo', fontWeight:800, fontSize:16, color: cat.color }}>
+                  {cat.name}
+                </span>
+                <span style={{
+                  background:`${cat.color}18`, color:cat.color,
+                  border:`1px solid ${cat.color}30`,
+                  borderRadius:99, padding:'1px 9px', fontSize:11, fontWeight:800,
+                }}>{items.length}</span>
+                {catTotal > 0 && (
+                  <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:600 }}>
+                    · ₪{catTotal.toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <span style={{
+                fontSize:18, color:cat.color,
+                transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                transition:'transform 0.22s', lineHeight:1,
+              }}>▾</span>
+            </button>
+
+            {/* תוכן */}
+            {isOpen && (
+              <div style={{ padding:'12px 14px 14px', background:'var(--bg)', borderTop:`1px solid ${cat.color}25` }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                  {items.map(policy => (
+                    <PolicyCard key={policy.id} policy={policy}
+                      onEdit={onEdit} onDelete={onDelete}
+                      uploadDocument={uploadDocument}
+                      deleteDocument={deleteDocument}
+                      getDocumentUrl={getDocumentUrl}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Main Insurance App ────────────────────────────────────────────────────────
 const NAV = [
   { k:'policies',   icon:'🛡️', label:'פוליסות' },
@@ -572,17 +681,15 @@ export default function InsuranceApp({ activePage, onPageChange }) {
                 <p>אין פוליסות ביטוח עדיין</p>
               </div>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                {filtered.map(policy => (
-                  <PolicyCard key={policy.id} policy={policy}
-                    onEdit={p => { setEditing(p); setModal(true) }}
-                    onDelete={data.deletePolicy}
-                    uploadDocument={data.uploadDocument}
-                    deleteDocument={data.deleteDocument}
-                    getDocumentUrl={data.getDocumentUrl}
-                  />
-                ))}
-              </div>
+              <PolicyAccordion
+                policies={filtered}
+                categories={data.categories}
+                onEdit={p => { setEditing(p); setModal(true) }}
+                onDelete={data.deletePolicy}
+                uploadDocument={data.uploadDocument}
+                deleteDocument={data.deleteDocument}
+                getDocumentUrl={data.getDocumentUrl}
+              />
             )}
           </div>
         )}

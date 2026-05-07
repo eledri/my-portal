@@ -32,14 +32,12 @@ function useFinanceData() {
 
   const fetchAll = useCallback(async () => {
     if (!user) return
-    console.log('[fetchAll] user=', user.id)
 
     const { data: memberships, error: memErr } = await supabase
       .from('fin_group_members')
       .select('group_id, role')
       .eq('user_id', user.id)
 
-    console.log('[fetchAll] memberships=', memberships, 'error=', memErr)
     if (!memberships?.length) { setLoading(false); return }
 
     const groupIds = memberships.map(m => m.group_id)
@@ -49,11 +47,9 @@ function useFinanceData() {
       .select('*')
       .in('id', groupIds)
 
-    console.log('[fetchAll] groupsData=', groupsData, 'error=', grpErr)
     if (!groupsData?.length) { setLoading(false); return }
 
     const first = groupsData[0]
-    console.log('[fetchAll] setting groupId=', first.id)
     setGroups(groupsData)
     setGroup(first)
     setGroupId(first.id)
@@ -72,11 +68,9 @@ function useFinanceData() {
 
   // כל פונקציה מקבלת gid ישירות — אין תלות ב-state
   const addCategory = useCallback(async (d) => {
-    console.log('[addCategory] groupId=', groupId, 'd=', d)
     if (!groupId) return { error: new Error('אין קבוצה פעילה') }
     const { data, error } = await supabase.from('fin_categories')
       .insert({ ...d, group_id: groupId }).select().single()
-    console.log('[addCategory] result', { data, error })
     if (!error) setCategories(p => [...p, data])
     return { error }
   }, [groupId])
@@ -442,11 +436,9 @@ function CategoriesPage({ categories, records, addCategory, deleteCategory }) {
   const [saving, setSaving] = useState(false)
 
   const add = async () => {
-    console.log('[add] name=', name, 'calling addCategory')
     if (!name.trim()) return
     setSaving(true)
     const result = await addCategory({ name: name.trim(), color, icon })
-    console.log('[add] result=', result)
     setSaving(false); setName('')
   }
 
