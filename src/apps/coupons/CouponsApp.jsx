@@ -452,7 +452,7 @@ function groupByBrand(coupons) {
 // ─────────────────────────────────────────────────────────────
 // Main App
 // ─────────────────────────────────────────────────────────────
-export default function CouponsApp() {
+export default function CouponsApp({ activePage, onPageChange }) {
   const { coupons, loading, add, update, remove, redeem, restore } = useCoupons()
   const [tab, setTab]         = useState('active')   // 'active' | 'history'
   const [modal, setModal]     = useState(false)

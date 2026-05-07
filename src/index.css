@@ -4,7 +4,6 @@
 
 :root {
   --bg: #f4f6f9;
-  --bg2: #eef0f5;
   --surface: #ffffff;
   --surface2: #f0f2f7;
   --surface3: #e8ebf2;
@@ -13,17 +12,12 @@
   --accent: #2563eb;
   --accent2: #1d4ed8;
   --accent-glow: rgba(37,99,235,0.10);
-  --gold: #d97706;
   --green: #059669;
   --red: #dc2626;
   --text: #0f172a;
   --text-muted: #64748b;
-  --text-dim: #94a3b8;
   --radius: 14px;
   --radius-sm: 8px;
-  --header-h: 54px;
-  --sidebar-w: 210px;
-  --page-px: 24px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,7 +31,6 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
-
 h1,h2,h3,h4,h5 { font-family: 'Heebo', sans-serif; }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -100,12 +93,11 @@ select.input { background: var(--surface); cursor: pointer; }
   touch-action: manipulation;
 }
 .btn-primary { background: var(--accent); color: white; }
-.btn-primary:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.25); }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:hover { background: var(--accent2); }
+.btn-primary:active { opacity: 0.9; transform: scale(0.98); }
 .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
 .btn-danger { background: rgba(220,38,38,0.08); color: var(--red); border: 1px solid rgba(220,38,38,0.2); }
-.btn-danger:hover { background: rgba(220,38,38,0.15); }
 
 /* ── Badge ── */
 .badge {
@@ -117,14 +109,14 @@ select.input { background: var(--surface); cursor: pointer; }
   font-weight: 700;
 }
 
-/* ── Modal ── */
+/* ── Modal (bottom sheet on mobile, centered on desktop) ── */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15,23,42,0.45);
+  background: rgba(15,23,42,0.5);
   backdrop-filter: blur(3px);
   display: flex;
-  align-items: flex-end;   /* mobile: slide up from bottom */
+  align-items: flex-end;
   justify-content: center;
   z-index: 200;
   padding: 0;
@@ -133,32 +125,28 @@ select.input { background: var(--surface); cursor: pointer; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius) var(--radius) 0 0;
-  padding: 24px 20px;
+  padding: 20px 18px;
   width: 100%;
   max-height: 92vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
 }
-
-/* Desktop modal */
 @media (min-width: 640px) {
   .modal-overlay { align-items: center; padding: 20px; }
-  .modal-box {
-    border-radius: var(--radius);
-    max-width: 480px;
-    max-height: 90vh;
-  }
+  .modal-box { border-radius: var(--radius); max-width: 500px; max-height: 90vh; }
 }
 
-/* ── App Layout ── */
+/* ── App shell layout ── */
 .app-layout {
   display: flex;
   height: 100%;
+  overflow: hidden;
 }
 
-/* Sidebar — hidden on mobile, visible on desktop */
+/* Desktop sidebar */
 .app-sidebar {
-  width: var(--sidebar-w);
+  width: 210px;
   background: var(--surface);
   border-left: 1px solid var(--border);
   display: flex;
@@ -174,61 +162,83 @@ select.input { background: var(--surface); cursor: pointer; }
   min-width: 0;
 }
 
-/* Mobile: sidebar becomes bottom nav */
+/* On mobile, hide the sidebar — it's replaced by the drawer */
 @media (max-width: 639px) {
-  .app-layout { flex-direction: column; }
-
-  .app-sidebar {
-    width: 100%;
-    height: auto;
-    border-left: none;
-    border-top: 1px solid var(--border);
-    order: 2;           /* bottom */
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 6px 8px;
-    padding-bottom: max(6px, env(safe-area-inset-bottom));
-    flex-shrink: 0;
-  }
-
-  .app-main { order: 1; }
-
-  /* Nav buttons become compact horizontal tabs */
-  .nav-btn {
-    flex-direction: column !important;
-    gap: 2px !important;
-    padding: 6px 10px !important;
-    font-size: 11px !important;
-    border-right: none !important;
-    border-bottom: 2px solid transparent !important;
-    min-width: 56px;
-    flex: 1;
-  }
-  .nav-btn.active {
-    border-right: none !important;
-    border-bottom-color: var(--accent) !important;
-  }
-  .nav-icon { font-size: 20px !important; }
+  .app-sidebar { display: none; }
 }
 
-/* ── Page padding responsive ── */
+/* ── Drawer (mobile burger menu) ── */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 300;
+  display: none;
+}
+.drawer-overlay.open { display: block; }
+
+.drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 75vw;
+  max-width: 280px;
+  background: var(--surface);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  overflow-y: auto;
+}
+.drawer-panel.open { transform: translateX(0); }
+
+/* Burger button — only on mobile */
+.burger-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+}
+.burger-btn span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: all 0.25s;
+}
+@media (max-width: 639px) {
+  .burger-btn { display: flex; }
+}
+
+/* ── Page content ── */
 .page-content {
-  padding: 20px var(--page-px);
+  padding: 20px 24px;
   max-width: 900px;
 }
 @media (max-width: 639px) {
-  .page-content { padding: 16px 14px; }
+  .page-content { padding: 14px 12px; }
 }
 
-/* ── Responsive grid ── */
+/* ── Responsive grids ── */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 @media (max-width: 639px) {
-  .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
 }
 
 .two-col {
@@ -237,7 +247,7 @@ select.input { background: var(--surface); cursor: pointer; }
   gap: 16px;
 }
 @media (max-width: 639px) {
-  .two-col { grid-template-columns: 1fr; gap: 12px; }
+  .two-col { grid-template-columns: 1fr; gap: 10px; }
 }
 
 .cat-grid {
@@ -246,23 +256,22 @@ select.input { background: var(--surface); cursor: pointer; }
   gap: 12px;
 }
 @media (max-width: 639px) {
-  .cat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
 }
 
-/* ── Table → Cards on mobile ── */
+/* ── Table vs cards ── */
 .data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 11px 14px; text-align: right; }
+.data-table th, .data-table td { padding: 10px 14px; text-align: right; }
 .data-table th { font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border); }
 .data-table td { border-bottom: 1px solid var(--border); font-size: 14px; }
 .data-table tr:last-child td { border-bottom: none; }
 
-/* On mobile: hide table, show record cards */
 .table-wrap { overflow: hidden; }
+.record-cards { display: none; flex-direction: column; gap: 8px; }
 @media (max-width: 639px) {
   .table-wrap { display: none; }
-  .record-cards { display: flex !important; }
+  .record-cards { display: flex; }
 }
-.record-cards { display: none; flex-direction: column; gap: 8px; }
 
 /* ── Animations ── */
 @keyframes fadeUp {

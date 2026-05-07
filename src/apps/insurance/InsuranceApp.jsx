@@ -476,8 +476,9 @@ const NAV = [
   { k:'categories', icon:'🗂️', label:'קטגוריות' },
 ]
 
-export default function InsuranceApp() {
-  const [page, setPage]       = useState('policies')
+export default function InsuranceApp({ activePage, onPageChange }) {
+  const page    = activePage || 'policies'
+  const setPage = onPageChange
   const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState(null)
   const [filterCat, setFilterCat] = useState('')
@@ -488,31 +489,7 @@ export default function InsuranceApp() {
   const filtered = filterCat ? data.policies.filter(p => p.category_id === filterCat) : data.policies
 
   return (
-    <div className="app-layout" style={{ height:'100%' }}>
-      {/* Sidebar */}
-      <aside className="app-sidebar">
-        <nav style={{ flex:1, padding:'10px 8px', display:'flex', flexDirection:'column' }}>
-          {NAV.map(n => (
-            <button key={n.k} onClick={() => setPage(n.k)}
-              className={`nav-btn${page===n.k ? ' active' : ''}`}
-              style={{
-                width:'100%', display:'flex', alignItems:'center', gap:8,
-                padding:'9px 12px', borderRadius:9, border:'none',
-                background: page===n.k ? 'rgba(37,99,235,0.08)' : 'transparent',
-                color: page===n.k ? 'var(--accent)' : 'var(--text-muted)',
-                fontFamily:'Heebo', fontWeight: page===n.k ? 700 : 500,
-                fontSize:14, cursor:'pointer', textAlign:'right',
-                borderRight: page===n.k ? '2px solid var(--accent)' : '2px solid transparent',
-                marginBottom:2, transition:'all 0.16s', flexShrink:0,
-              }}>
-              <span className="nav-icon" style={{ fontSize:18 }}>{n.icon}</span><span>{n.label}</span>
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      {/* Main */}
-      <main className="app-main">
+    <div style={{ height:'100%', overflowY:'auto' }}>
         {page === 'categories' ? (
           <CategoriesPage categories={data.categories} policies={data.policies} addCategory={data.addCategory} deleteCategory={data.deleteCategory} />
         ) : (
@@ -584,8 +561,6 @@ export default function InsuranceApp() {
             )}
           </div>
         )}
-      </main>
-
       {modal && (
         <PolicyModal
           categories={data.categories}

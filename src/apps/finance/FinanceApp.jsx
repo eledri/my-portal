@@ -621,27 +621,27 @@ function SharingPage({ group, members, inviteMember, acceptInvite }) {
 }
 
 // ── Main Finance App ─────────────────────────────────────────────────────────
-export default function FinanceApp() {
-  const [page, setPage] = useState('dashboard')
+export default function FinanceApp({ activePage, onPageChange }) {
+  const page = activePage || 'dashboard'
+  const setPage = onPageChange
   const data = useFinanceData()
 
   if (data.loading) return (
-    <div style={{ display:'grid', placeItems:'center', height:'100%', color:'var(--text-muted)', flexDirection:'column', gap:12 }}>
-      <div style={{ fontSize:28 }}>₪</div>
-      <span style={{ fontSize:15 }}>טוען נתונים...</span>
+    <div style={{ display:'grid', placeItems:'center', height:'100%', color:'var(--text-muted)' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontSize:32, marginBottom:10 }}>₪</div>
+        <span style={{ fontSize:15 }}>טוען נתונים...</span>
+      </div>
     </div>
   )
 
   return (
-    <div className="app-layout" style={{ height:'100%' }}>
-      <main className="app-main">
-        {page==='dashboard'  && <Dashboard records={data.records} />}
-        {page==='records'    && <RecordsPage records={data.records} categories={data.categories} addRecord={data.addRecord} updateRecord={data.updateRecord} deleteRecord={data.deleteRecord} />}
-        {page==='categories' && <CategoriesPage categories={data.categories} records={data.records} addCategory={data.addCategory} deleteCategory={data.deleteCategory} />}
-        {page==='analytics'  && <AnalyticsPage records={data.records} />}
-        {page==='sharing'    && <SharingPage group={data.group} members={data.members} inviteMember={data.inviteMember} acceptInvite={data.acceptInvite} />}
-      </main>
-      <Sidebar page={page} setPage={setPage} groups={data.groups} group={data.group} setGroup={data.setGroup} />
+    <div style={{ height:'100%', overflowY:'auto' }}>
+      {page==='dashboard'  && <Dashboard records={data.records} />}
+      {page==='records'    && <RecordsPage records={data.records} categories={data.categories} addRecord={data.addRecord} updateRecord={data.updateRecord} deleteRecord={data.deleteRecord} />}
+      {page==='categories' && <CategoriesPage categories={data.categories} records={data.records} addCategory={data.addCategory} deleteCategory={data.deleteCategory} />}
+      {page==='analytics'  && <AnalyticsPage records={data.records} />}
+      {page==='sharing'    && <SharingPage group={data.group} members={data.members} inviteMember={data.inviteMember} acceptInvite={data.acceptInvite} />}
     </div>
   )
 }

@@ -17,6 +17,13 @@ export const APPS = [
     gradient:    'linear-gradient(135deg, #f59e0b, #d97706)',
     component:   FinanceApp,
     tags:        ['כספים', 'תקציב', 'גרפים'],
+    navItems: [
+      { key:'dashboard',  icon:'📊', label:'לוח בקרה' },
+      { key:'records',    icon:'📝', label:'רשומות' },
+      { key:'categories', icon:'🗂️', label:'קטגוריות' },
+      { key:'analytics',  icon:'📈', label:'אנליזה' },
+      { key:'sharing',    icon:'👥', label:'שיתוף' },
+    ],
   },
   {
     id:          'insurance',
@@ -27,6 +34,10 @@ export const APPS = [
     gradient:    'linear-gradient(135deg, #3b82f6, #1d4ed8)',
     component:   InsuranceApp,
     tags:        ['ביטוח', 'פוליסות', 'מסמכים'],
+    navItems: [
+      { key:'policies',   icon:'🛡️', label:'פוליסות' },
+      { key:'categories', icon:'🗂️', label:'קטגוריות' },
+    ],
   },
   {
     id:          'coupons',
