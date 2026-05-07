@@ -525,6 +525,111 @@ function groupByBrand(coupons) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Grouped Accordion — קטגוריות עם קפל/פתח
+// ─────────────────────────────────────────────────────────────
+function GroupedCoupons({ groups, onRedeem, onRestore, onEdit, onDelete, onExpand }) {
+  // כל הקטגוריות סגורות בהתחלה — רק הראשונה פתוחה
+  const [openGroups, setOpenGroups] = useState(() => {
+    const init = {}
+    if (groups.length > 0) init[groups[0].label] = true
+    return init
+  })
+
+  const toggle = (label) => {
+    setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }))
+  }
+
+  const expandAll = () => {
+    const all = {}
+    groups.forEach(g => { all[g.label] = true })
+    setOpenGroups(all)
+  }
+
+  const collapseAll = () => setOpenGroups({})
+
+  const anyOpen = groups.some(g => openGroups[g.label])
+
+  return (
+    <div>
+      {/* כפתורי פתח/סגור הכל */}
+      <div style={{ display:'flex', gap:8, marginBottom:14, justifyContent:'flex-end' }}>
+        <button onClick={anyOpen ? collapseAll : expandAll}
+          style={{
+            background:'none', border:'1px solid var(--border)', borderRadius:7,
+            padding:'5px 12px', fontSize:12, fontWeight:600, color:'var(--text-muted)',
+            cursor:'pointer', display:'flex', alignItems:'center', gap:5,
+          }}>
+          {anyOpen ? '⊟ סגור הכל' : '⊞ פתח הכל'}
+        </button>
+      </div>
+
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {groups.map(group => {
+          const isOpen = !!openGroups[group.label]
+          return (
+            <div key={group.label} style={{
+              border: `1px solid ${group.color.border}`,
+              borderRadius:12, overflow:'hidden',
+            }}>
+              {/* כותרת קטגוריה — לחיצה לקפל/פתח */}
+              <button
+                onClick={() => toggle(group.label)}
+                style={{
+                  width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'12px 16px',
+                  background: isOpen ? group.color.bg : 'var(--surface)',
+                  border:'none', cursor:'pointer',
+                  borderRight: `4px solid ${group.color.text}`,
+                  transition:'background 0.18s',
+                }}
+              >
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <h3 style={{ fontWeight:800, fontSize:16, color: group.color.text, margin:0 }}>
+                    {group.label}
+                  </h3>
+                  <span style={{
+                    background: group.color.bg,
+                    border: `1px solid ${group.color.border}`,
+                    color: group.color.text,
+                    borderRadius:99, padding:'1px 9px', fontSize:11, fontWeight:800,
+                  }}>
+                    {group.items.length}
+                  </span>
+                </div>
+                <span style={{
+                  fontSize:18, color: group.color.text,
+                  transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                  transition:'transform 0.22s',
+                  display:'block', lineHeight:1,
+                }}>▾</span>
+              </button>
+
+              {/* תוכן — מוצג רק כשפתוח */}
+              {isOpen && (
+                <div style={{
+                  padding:'12px 14px 14px',
+                  background:'var(--bg)',
+                  borderTop: `1px solid ${group.color.border}`,
+                }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(270px,1fr))', gap:10 }}>
+                    {group.items.map(c => (
+                      <CouponCard key={c.id} coupon={c}
+                        brandColor={group.color}
+                        onRedeem={onRedeem} onRestore={onRestore}
+                        onEdit={onEdit} onDelete={onDelete} onExpand={onExpand} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
 // Main App
 // ─────────────────────────────────────────────────────────────
 export default function CouponsApp({ activePage, onPageChange }) {
@@ -636,43 +741,15 @@ export default function CouponsApp({ activePage, onPageChange }) {
         </div>
       )}
 
-      {/* Grouped view */}
+      {/* Grouped view — accordion */}
       {grouped && filtered.length > 0 && (
-        <div style={{ display:'flex', flexDirection:'column', gap:22 }}>
-          {groups.map(group => (
-            <div key={group.label}>
-              {/* כותרת קטגוריה עם צבע */}
-              <div style={{
-                display:'flex', alignItems:'center', gap:10, marginBottom:12,
-                padding:'10px 14px',
-                background: group.color.bg,
-                border: `1px solid ${group.color.border}`,
-                borderRadius:10,
-                borderRight: `4px solid ${group.color.text}`,
-              }}>
-                <h3 style={{ fontWeight:800, fontSize:16, color: group.color.text, margin:0 }}>
-                  {group.label}
-                </h3>
-                <span style={{
-                  background: group.color.border, color: group.color.text,
-                  borderRadius:99, padding:'1px 9px', fontSize:11, fontWeight:800,
-                }}>
-                  {group.items.length}
-                </span>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px,1fr))', gap:12 }}>
-                {group.items.map(c => (
-                  <CouponCard key={c.id} coupon={c}
-                    brandColor={group.color}
-                    onRedeem={redeem} onRestore={restore}
-                    onEdit={c => { setEditing(c); setModal(true) }}
-                    onDelete={id => confirm('למחוק קופון זה?') && remove(id)}
-                    onExpand={setExpanded} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <GroupedCoupons
+          groups={groups}
+          onRedeem={redeem} onRestore={restore}
+          onEdit={c => { setEditing(c); setModal(true) }}
+          onDelete={id => confirm('למחוק קופון זה?') && remove(id)}
+          onExpand={setExpanded}
+        />
       )}
 
       {/* Flat view */}
