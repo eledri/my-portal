@@ -731,7 +731,15 @@ function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCh
 
         {/* Status badge */}
         <div style={{ position:'absolute', top:14, right:14 }}>
-          <span className="badge" style={{ background: status.bg, color: status.color, backdropFilter:'blur(8px)', border:`1px solid ${status.color}40` }}>
+          <span style={{
+            display:'inline-flex', alignItems:'center',
+            background:'rgba(0,0,0,0.55)', backdropFilter:'blur(10px)',
+            color:'white', fontFamily:'Heebo', fontWeight:800,
+            fontSize:14, borderRadius:99, padding:'5px 14px',
+            border:'1.5px solid rgba(255,255,255,0.25)',
+            boxShadow:'0 2px 12px rgba(0,0,0,0.4)',
+            textShadow:'none', letterSpacing:0.3,
+          }}>
             {status.label}
           </span>
         </div>
