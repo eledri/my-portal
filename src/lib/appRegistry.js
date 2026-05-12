@@ -53,7 +53,7 @@ export const APPS = [
   {
     id:          'vacations',
     title:       'החופשות שלי',
-    description: 'תכנון חופשות, לוח שנה יומי, פרטי טיסה ורכב, צ'קליסט',
+    description: 'תכנון חופשות, לוח שנה יומי, פרטי טיסה ורכב, צ\'קליסט',
     icon:        '✈️',
     color:       '#10b981',
     gradient:    'linear-gradient(135deg, #10b981, #059669)',
