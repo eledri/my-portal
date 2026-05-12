@@ -5,7 +5,8 @@
 
 import FinanceApp   from '../apps/finance/FinanceApp.jsx'
 import InsuranceApp from '../apps/insurance/InsuranceApp.jsx'
-import CouponsApp   from '../apps/coupons/CouponsApp.jsx'
+import CouponsApp    from '../apps/coupons/CouponsApp.jsx'
+import VacationsApp from '../apps/vacations/VacationsApp.jsx'
 
 export const APPS = [
   {
@@ -48,6 +49,16 @@ export const APPS = [
     gradient:    'linear-gradient(135deg, #8b5cf6, #6d28d9)',
     component:   CouponsApp,
     tags:        ['קופונים', 'הנחות'],
+  },
+  {
+    id:          'vacations',
+    title:       'החופשות שלי',
+    description: 'תכנון חופשות, לוח שנה יומי, פרטי טיסה ורכב, צ'קליסט',
+    icon:        '✈️',
+    color:       '#10b981',
+    gradient:    'linear-gradient(135deg, #10b981, #059669)',
+    component:   VacationsApp,
+    tags:        ['חופשות', 'טיסות', 'תכנון'],
   },
   // ── הוסף כלים נוספים כאן ──
   // {

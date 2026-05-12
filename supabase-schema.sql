@@ -264,3 +264,55 @@ CREATE POLICY "insurance delete"
     bucket_id = 'insurance-docs' AND
     auth.uid()::text = (string_to_array(name, '/'))[1]
   );
+
+-- ════════════════════════════════════════════════════════════
+-- VACATIONS MODULE
+-- ════════════════════════════════════════════════════════════
+
+CREATE TABLE vacations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  destination TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  notes TEXT,
+  photo_url TEXT,
+  -- טיסה
+  airline TEXT,
+  flight_out TEXT,
+  flight_back TEXT,
+  flight_notes TEXT,
+  -- רכב
+  has_car BOOLEAN DEFAULT FALSE,
+  car_company TEXT,
+  car_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE vacation_schedule (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  vacation_id UUID REFERENCES vacations(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  day_date DATE NOT NULL,
+  day_number INTEGER NOT NULL,
+  title TEXT DEFAULT '',
+  activities TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE vacation_checklist (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  vacation_id UUID REFERENCES vacations(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  task TEXT NOT NULL,
+  done BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE vacations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vacation_schedule ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vacation_checklist ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "vacations_own"          ON vacations          FOR ALL USING (user_id = auth.uid());
+CREATE POLICY "vacation_schedule_own"  ON vacation_schedule  FOR ALL USING (user_id = auth.uid());
+CREATE POLICY "vacation_checklist_own" ON vacation_checklist FOR ALL USING (user_id = auth.uid());
