@@ -54,20 +54,45 @@ function translateDest(dest) {
 
 async function fetchDestinationPhoto(destination) {
   const eng = translateDest(destination)
-  // Wikipedia page image
+  const hash = destination.split('').reduce((a,c) => a + c.charCodeAt(0), 0)
+
+  // ניסיון 1: Wikipedia — תמונה של הדף
   try {
+    const slug = eng.replace(/ /g, '_')
     const res = await fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(eng)}&prop=pageimages&format=json&pithumbsize=800&origin=*`
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(slug)}&prop=pageimages&format=json&pithumbsize=1200&origin=*`,
+      { signal: AbortSignal.timeout(4000) }
     )
     if (res.ok) {
       const data = await res.json()
-      const pages = Object.values(data.query?.pages || {})
-      const thumb = pages[0]?.thumbnail?.source
-      if (thumb) return thumb.replace(/\/\d+px-/, '/800px-')
+      const pages = Object.values(data?.query?.pages || {})
+      const src = pages[0]?.thumbnail?.source
+      if (src && !src.includes('Flag') && !src.includes('flag') && !src.includes('map') && !src.includes('Map')) {
+        return src.replace(/\/\d+px-/, '/1200px-')
+      }
     }
   } catch {}
-  // Gradient fallback
-  const hash = destination.split('').reduce((a,c) => a + c.charCodeAt(0), 0)
+
+  // ניסיון 2: Wikimedia Commons — חיפוש תמונת נוף
+  try {
+    const q = encodeURIComponent(eng + ' cityscape OR landmark OR skyline OR beach OR temple')
+    const res = await fetch(
+      `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${q}&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*&gsrlimit=3`,
+      { signal: AbortSignal.timeout(4000) }
+    )
+    if (res.ok) {
+      const data = await res.json()
+      const pages = Object.values(data?.query?.pages || {})
+      for (const p of pages) {
+        const url = p?.imageinfo?.[0]?.thumburl
+        if (url && (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png'))) {
+          return url
+        }
+      }
+    }
+  } catch {}
+
+  // Gradient fallback יפה
   return 'GRADIENT:' + GRADIENTS[hash % GRADIENTS.length] + ':' + eng
 }
 
@@ -217,7 +242,15 @@ function useVacations() {
     return data?.signedUrl || null
   }
 
-  return { vacations, loading, add, update, remove, updateScheduleDay, toggleCheckItem, addCheckItem, deleteCheckItem, uploadDocument, deleteDocument, getDocumentUrl }
+  const refreshPhoto = async (id) => {
+    const v = vacations.find(v => v.id === id)
+    if (!v) return
+    const photo = await fetchDestinationPhoto(v.destination)
+    await supabase.from('vacations').update({ photo_url: photo }).eq('id', id)
+    setVacations(p => p.map(v => v.id === id ? { ...v, photo_url: photo } : v))
+  }
+
+  return { vacations, loading, add, update, remove, updateScheduleDay, toggleCheckItem, addCheckItem, deleteCheckItem, uploadDocument, deleteDocument, getDocumentUrl, refreshPhoto }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -666,7 +699,7 @@ function VacationDocuments({ vacation, onUpload, onDelete, onGetUrl }) {
 // ─────────────────────────────────────────────────────────────
 // Vacation Card (expandable)
 // ─────────────────────────────────────────────────────────────
-function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCheck, onAddCheck, onDeleteCheck, onUploadDoc, onDeleteDoc, onGetDocUrl }) {
+function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCheck, onAddCheck, onDeleteCheck, onUploadDoc, onDeleteDoc, onGetDocUrl, onRefreshPhoto }) {
   const [expanded, setExpanded] = useState(false)
   const [tab, setTab]           = useState('schedule')
 
@@ -709,6 +742,13 @@ function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCh
             style={{ background:'rgba(255,255,255,0.2)', backdropFilter:'blur(8px)', border:'none', borderRadius:8, padding:'5px 8px', cursor:'pointer', color:'white', fontSize:14 }}>✏️</button>
           <button onClick={e=>{e.stopPropagation();confirm('למחוק חופשה זו?')&&onDelete(vacation.id)}}
             style={{ background:'rgba(255,255,255,0.2)', backdropFilter:'blur(8px)', border:'none', borderRadius:8, padding:'5px 8px', cursor:'pointer', color:'white', fontSize:14 }}>🗑️</button>
+          <button onClick={async e=>{
+            e.stopPropagation()
+            const photo = await fetchDestinationPhoto(vacation.destination)
+            onRefreshPhoto(vacation.id, photo)
+          }}
+            title="רענן תמונה"
+            style={{ background:'rgba(255,255,255,0.2)', backdropFilter:'blur(8px)', border:'none', borderRadius:8, padding:'5px 8px', cursor:'pointer', color:'white', fontSize:14 }}>🖼️</button>
         </div>
 
         {/* Destination info */}
@@ -918,7 +958,7 @@ function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCh
 // Main App
 // ─────────────────────────────────────────────────────────────
 export default function VacationsApp({ activePage, onPageChange }) {
-  const { vacations, loading, add, update, remove, updateScheduleDay, toggleCheckItem, addCheckItem, deleteCheckItem, uploadDocument, deleteDocument, getDocumentUrl } = useVacations()
+  const { vacations, loading, add, update, remove, updateScheduleDay, toggleCheckItem, addCheckItem, deleteCheckItem, uploadDocument, deleteDocument, getDocumentUrl, refreshPhoto } = useVacations()
   const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState(null)
   const [filter, setFilter]   = useState('all') // all | upcoming | past
@@ -1007,6 +1047,7 @@ export default function VacationsApp({ activePage, onPageChange }) {
           onUploadDoc={uploadDocument}
           onDeleteDoc={deleteDocument}
           onGetDocUrl={getDocumentUrl}
+          onRefreshPhoto={refreshPhoto}
         />
       ))}
 
