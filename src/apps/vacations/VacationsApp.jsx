@@ -153,8 +153,48 @@ function useVacations() {
 
   const update = async (id, d) => {
     const { data, error } = await supabase.from('vacations').update(d).eq('id', id)
-      .select('*, vacation_schedule(*), vacation_checklist(*)').single()
-    if (!error) setVacations(p => p.map(v => v.id === id ? data : v))
+      .select('*, vacation_schedule(*), vacation_checklist(*), vacation_documents(*)').single()
+    if (!error) {
+      // סנכרון לוח שנה אם התאריכים השתנו
+      if (d.start_date && d.end_date) {
+        const existingSchedule = data.vacation_schedule || []
+        const newDays = eachDayOfInterval({ start: new Date(d.start_date), end: new Date(d.end_date) })
+        const newDayDates = new Set(newDays.map(day => format(day, 'yyyy-MM-dd')))
+        const existingDates = new Set(existingSchedule.map(s => s.day_date))
+
+        // מחק ימים שאינם בטווח החדש
+        const toDelete = existingSchedule.filter(s => !newDayDates.has(s.day_date))
+        if (toDelete.length > 0) {
+          await supabase.from('vacation_schedule').delete().in('id', toDelete.map(s => s.id))
+        }
+
+        // הוסף ימים חדשים שאינם קיימים
+        const toAdd = newDays.filter(day => !existingDates.has(format(day, 'yyyy-MM-dd')))
+        if (toAdd.length > 0) {
+          const newRows = toAdd.map((day, i) => ({
+            vacation_id: id,
+            user_id: user.id,
+            day_date: format(day, 'yyyy-MM-dd'),
+            day_number: newDays.indexOf(day) + 1,
+            title: `יום ${newDays.indexOf(day) + 1}`,
+            activities: '',
+          }))
+          await supabase.from('vacation_schedule').insert(newRows)
+        }
+
+        // עדכן מספרי הימים לכל הלוז
+        const { data: updatedSched } = await supabase
+          .from('vacation_schedule').select('*').eq('vacation_id', id).order('day_date')
+        if (updatedSched) {
+          // עדכן day_number לפי סדר
+          await Promise.all(updatedSched.map((s, i) =>
+            supabase.from('vacation_schedule').update({ day_number: i + 1 }).eq('id', s.id)
+          ))
+          data.vacation_schedule = updatedSched.map((s, i) => ({ ...s, day_number: i + 1 }))
+        }
+      }
+      setVacations(p => p.map(v => v.id === id ? data : v))
+    }
     return { error }
   }
 
