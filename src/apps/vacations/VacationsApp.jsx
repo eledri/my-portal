@@ -5,26 +5,70 @@ import { format, eachDayOfInterval, differenceInDays, isPast, isFuture, isToday 
 import { he } from 'date-fns/locale'
 
 // ─────────────────────────────────────────────────────────────
-// Unsplash — תמונת יעד אוטומטית
+// תמונת יעד — Wikipedia API (חינמי, ללא API key)
 // ─────────────────────────────────────────────────────────────
-const UNSPLASH_ACCESS_KEY = 'your_unsplash_key' // ← אופציונלי, עובד גם בלי
+const DEST_TRANSLATIONS = {
+  'תאילנד':'Thailand','בנגקוק':'Bangkok','פוקט':'Phuket',
+  'יוון':'Greece','אתונה':'Athens','סנטוריני':'Santorini','מיקונוס':'Mykonos',
+  'איטליה':'Italy','רומא':'Rome','מילאנו':'Milan','פירנצה':'Florence','ונציה':'Venice',
+  'צרפת':'France','פריז':'Paris','ניס':'Nice',
+  'ספרד':'Spain','ברצלונה':'Barcelona','מדריד':'Madrid',
+  'ארהב':'United States','ניו יורק':'New York City','לוס אנג\'לס':'Los Angeles',
+  'מיאמי':'Miami','לס וגאס':'Las Vegas',
+  'יפן':'Japan','טוקיו':'Tokyo','קיוטו':'Kyoto','אוסקה':'Osaka',
+  'דובאי':'Dubai','אבו דאבי':'Abu Dhabi',
+  'לונדון':'London','אמסטרדם':'Amsterdam','ברלין':'Berlin','פראג':'Prague',
+  'וינה':'Vienna','בודפשט':'Budapest','ליסבון':'Lisbon',
+  'מקסיקו':'Mexico','קנקון':'Cancun','ברזיל':'Brazil','ריו':'Rio de Janeiro',
+  'הודו':'India','מומבאי':'Mumbai','גואה':'Goa',
+  'אינדונזיה':'Indonesia','באלי':'Bali',
+  'מלדיביים':'Maldives','סיישל':'Seychelles','מאוריציוס':'Mauritius',
+  'מרוקו':'Morocco','מרקש':'Marrakesh','פורטוגל':'Portugal',
+  'טורקיה':'Turkey','איסטנבול':'Istanbul','אנטליה':'Antalya',
+  'קפריסין':'Cyprus','כרתים':'Crete','רודוס':'Rhodes',
+  'סינגפור':'Singapore','הונג קונג':'Hong Kong','קמבודיה':'Cambodia',
+  'וייטנאם':'Vietnam','אוסטרליה':'Australia','סידני':'Sydney',
+  'קנדה':'Canada','טורונטו':'Toronto','איסלנד':'Iceland',
+  'שוויץ':'Switzerland','נורווגיה':'Norway','שוודיה':'Sweden',
+}
+
+const GRADIENTS = [
+  'linear-gradient(135deg,#667eea,#764ba2)',
+  'linear-gradient(135deg,#f093fb,#f5576c)',
+  'linear-gradient(135deg,#4facfe,#00f2fe)',
+  'linear-gradient(135deg,#43e97b,#38f9d7)',
+  'linear-gradient(135deg,#fa709a,#fee140)',
+  'linear-gradient(135deg,#a18cd1,#fbc2eb)',
+  'linear-gradient(135deg,#fda085,#f6d365)',
+  'linear-gradient(135deg,#89f7fe,#66a6ff)',
+]
+
+function translateDest(dest) {
+  const t = dest.trim()
+  if (DEST_TRANSLATIONS[t]) return DEST_TRANSLATIONS[t]
+  for (const [h,e] of Object.entries(DEST_TRANSLATIONS)) {
+    if (t.includes(h)) return e
+  }
+  return t
+}
 
 async function fetchDestinationPhoto(destination) {
+  const eng = translateDest(destination)
+  // Wikipedia page image
   try {
-    const query = encodeURIComponent(`${destination} travel landmark`)
     const res = await fetch(
-      `https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(eng)}&prop=pageimages&format=json&pithumbsize=800&origin=*`
     )
-    if (!res.ok) throw new Error()
-    const data = await res.json()
-    return data.urls?.regular || null
-  } catch {
-    // Fallback: use a placeholder based on destination name
-    const hash = destination.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-    const colors = ['1a1a2e','16213e','0f3460','533483','2b2d42','8d99ae']
-    const color = colors[hash % colors.length]
-    return `https://via.placeholder.com/800x400/${color}/ffffff?text=${encodeURIComponent(destination)}`
-  }
+    if (res.ok) {
+      const data = await res.json()
+      const pages = Object.values(data.query?.pages || {})
+      const thumb = pages[0]?.thumbnail?.source
+      if (thumb) return thumb.replace(/\/\d+px-/, '/800px-')
+    }
+  } catch {}
+  // Gradient fallback
+  const hash = destination.split('').reduce((a,c) => a + c.charCodeAt(0), 0)
+  return 'GRADIENT:' + GRADIENTS[hash % GRADIENTS.length] + ':' + eng
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -39,7 +83,7 @@ function useVacations() {
     if (!user) return
     const { data } = await supabase
       .from('vacations')
-      .select('*, vacation_schedule(*), vacation_checklist(*)')
+      .select('*, vacation_schedule(*), vacation_checklist(*), vacation_documents(*)')
       .eq('user_id', user.id)
       .order('start_date', { ascending: true })
     setVacations(data || [])
@@ -139,7 +183,41 @@ function useVacations() {
     }
   }
 
-  return { vacations, loading, add, update, remove, updateScheduleDay, toggleCheckItem, addCheckItem, deleteCheckItem }
+  const uploadDocument = async (vacationId, file) => {
+    const ext  = file.name.split('.').pop()
+    const path = `${user.id}/${vacationId}/${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage.from('vacation-docs').upload(path, file)
+    if (upErr) return { error: upErr }
+    const { data, error } = await supabase.from('vacation_documents').insert({
+      vacation_id: vacationId, user_id: user.id,
+      filename: file.name, storage_path: path, size: file.size, mime_type: file.type,
+    }).select().single()
+    if (!error) {
+      setVacations(p => p.map(v => v.id === vacationId
+        ? { ...v, vacation_documents: [...(v.vacation_documents || []), data] }
+        : v
+      ))
+    }
+    return { data, error }
+  }
+
+  const deleteDocument = async (doc, vacationId) => {
+    await supabase.storage.from('vacation-docs').remove([doc.storage_path])
+    const { error } = await supabase.from('vacation_documents').delete().eq('id', doc.id)
+    if (!error) {
+      setVacations(p => p.map(v => v.id === vacationId
+        ? { ...v, vacation_documents: v.vacation_documents?.filter(d => d.id !== doc.id) }
+        : v
+      ))
+    }
+  }
+
+  const getDocumentUrl = async (storagePath) => {
+    const { data } = await supabase.storage.from('vacation-docs').createSignedUrl(storagePath, 3600)
+    return data?.signedUrl || null
+  }
+
+  return { vacations, loading, add, update, remove, updateScheduleDay, toggleCheckItem, addCheckItem, deleteCheckItem, uploadDocument, deleteDocument, getDocumentUrl }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -307,18 +385,20 @@ function VacationModal({ onSave, onClose, initial }) {
 function ScheduleEditor({ schedule, onUpdate }) {
   const [editingDay, setEditingDay] = useState(null)
   const [titleVal, setTitleVal]     = useState('')
+  const [locationVal, setLocationVal] = useState('')
   const [activVal, setActivVal]     = useState('')
   const [saving, setSaving]         = useState(false)
 
   const startEdit = (day) => {
     setEditingDay(day.id)
     setTitleVal(day.title || '')
+    setLocationVal(day.location || '')
     setActivVal(day.activities || '')
   }
 
   const saveDay = async (id) => {
     setSaving(true)
-    await onUpdate(id, { title: titleVal, activities: activVal })
+    await onUpdate(id, { title: titleVal, location: locationVal, activities: activVal })
     setSaving(false)
     setEditingDay(null)
   }
@@ -344,45 +424,70 @@ function ScheduleEditor({ schedule, onUpdate }) {
               padding:'10px 14px',
               background: dayIsToday ? 'rgba(37,99,235,0.06)' : 'var(--surface2)',
             }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0 }}>
                 <div style={{
-                  width:32, height:32, borderRadius:8,
+                  width:32, height:32, borderRadius:8, flexShrink:0,
                   background: dayIsToday ? 'var(--accent)' : 'var(--border)',
                   color: dayIsToday ? 'white' : 'var(--text-muted)',
                   display:'grid', placeItems:'center',
                   fontWeight:800, fontSize:13,
                 }}>{i+1}</div>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:14 }}>
-                    {isEditing ? (
-                      <input value={titleVal} onChange={e=>setTitleVal(e.target.value)}
-                        className="input" style={{ padding:'4px 8px', fontSize:13, width:160 }} />
-                    ) : day.title || `יום ${i+1}`}
-                  </div>
-                  <div style={{ fontSize:11, color:'var(--text-muted)' }}>
-                    {format(d, 'EEEE, d בMMMM', { locale: he })}
-                    {dayIsToday && <span style={{ color:'var(--accent)', fontWeight:700, marginRight:6 }}>• היום</span>}
+                <div style={{ flex:1, minWidth:0 }}>
+                  {isEditing ? (
+                    <input value={titleVal} onChange={e=>setTitleVal(e.target.value)}
+                      className="input" style={{ padding:'4px 8px', fontSize:13, marginBottom:4 }}
+                      placeholder="כותרת היום..." />
+                  ) : (
+                    <div style={{ fontWeight:700, fontSize:14 }}>{day.title || `יום ${i+1}`}</div>
+                  )}
+                  <div style={{ fontSize:11, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    <span>{format(d, 'EEEE, d בMMMM', { locale: he })}</span>
+                    {dayIsToday && <span style={{ color:'var(--accent)', fontWeight:700 }}>• היום</span>}
+                    {/* יעד — תצוגה */}
+                    {!isEditing && day.location && (
+                      <span style={{
+                        display:'inline-flex', alignItems:'center', gap:3,
+                        background:'rgba(16,185,129,0.08)', color:'var(--green)',
+                        border:'1px solid rgba(16,185,129,0.2)',
+                        borderRadius:99, padding:'1px 8px', fontSize:11, fontWeight:600,
+                      }}>
+                        📍 {day.location}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
               {isEditing ? (
-                <div style={{ display:'flex', gap:6 }}>
+                <div style={{ display:'flex', gap:6, flexShrink:0 }}>
                   <button className="btn btn-primary" onClick={() => saveDay(day.id)} disabled={saving}
                     style={{ padding:'5px 12px', fontSize:12 }}>{saving?'...':'שמור'}</button>
                   <button className="btn btn-ghost" onClick={() => setEditingDay(null)}
                     style={{ padding:'5px 10px', fontSize:12 }}>ביטול</button>
                 </div>
               ) : (
-                <button onClick={() => startEdit(day)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,color:'var(--text-muted)',padding:4 }}>✏️</button>
+                <button onClick={() => startEdit(day)} style={{ background:'none',border:'none',cursor:'pointer',fontSize:15,color:'var(--text-muted)',padding:4,flexShrink:0 }}>✏️</button>
               )}
             </div>
+
+            {/* Edit fields */}
+            {isEditing && (
+              <div style={{ padding:'10px 14px', background:'var(--surface2)', borderTop:'1px solid var(--border)' }}>
+                <label className="label">📍 יעד / עיר / אי</label>
+                <input value={locationVal} onChange={e=>setLocationVal(e.target.value)}
+                  className="input" style={{ fontSize:13, marginBottom:10 }}
+                  placeholder="בנגקוק, קוסמוי, פוקט..." />
+              </div>
+            )}
 
             {/* Activities */}
             <div style={{ padding:'10px 14px', background:'var(--surface)' }}>
               {isEditing ? (
-                <textarea value={activVal} onChange={e=>setActivVal(e.target.value)}
-                  className="input" rows={3} style={{ fontSize:13, resize:'vertical' }}
-                  placeholder="תוכנית היום, מסעדות, אטרקציות..." />
+                <>
+                  <label className="label" style={{ marginBottom:6 }}>תוכנית היום</label>
+                  <textarea value={activVal} onChange={e=>setActivVal(e.target.value)}
+                    className="input" rows={3} style={{ fontSize:13, resize:'vertical' }}
+                    placeholder="מסעדות, אטרקציות, הערות..." />
+                </>
               ) : (
                 <p style={{ fontSize:13, color: day.activities ? 'var(--text)' : 'var(--text-muted)', lineHeight:1.6, margin:0, whiteSpace:'pre-wrap' }}>
                   {day.activities || 'לחץ ✏️ להוספת תוכנית...'}
@@ -461,11 +566,109 @@ function Checklist({ items, vacationId, onToggle, onAdd, onDelete }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Vacation Documents — העלאת מסמכים
+// ─────────────────────────────────────────────────────────────
+function VacationDocuments({ vacation, onUpload, onDelete, onGetUrl }) {
+  const [uploading, setUploading]   = useState(false)
+  const [downloading, setDownloading] = useState(null)
+
+  const docs = vacation.vacation_documents || []
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploading(true)
+    const { error } = await onUpload(vacation.id, file)
+    setUploading(false)
+    if (error) alert('שגיאה בהעלאה: ' + error.message)
+    e.target.value = ''
+  }
+
+  const download = async (doc) => {
+    setDownloading(doc.id)
+    const url = await onGetUrl(doc.storage_path)
+    setDownloading(null)
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    else alert('שגיאה בהורדה')
+  }
+
+  const fileIcon = (mime) => {
+    if (mime?.includes('pdf'))   return '📄'
+    if (mime?.includes('image')) return '🖼️'
+    if (mime?.includes('word') || mime?.includes('doc')) return '📝'
+    return '📎'
+  }
+  const fmtSize = (b) => b > 1024*1024 ? `${(b/1024/1024).toFixed(1)} MB` : `${Math.round(b/1024)} KB`
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+        <p style={{ fontSize:13, color:'var(--text-muted)' }}>
+          כרטיסי טיסה, ביטוח, הזמנות מלון ועוד
+        </p>
+        <label style={{
+          cursor:'pointer', fontSize:13, fontWeight:700,
+          color:'white', background:'var(--accent)',
+          border:'none', borderRadius:8, padding:'7px 14px',
+          display:'flex', alignItems:'center', gap:6,
+          opacity: uploading ? 0.6 : 1,
+        }}>
+          {uploading ? '⏳ מעלה...' : '+ העלה מסמך'}
+          <input type="file" style={{ display:'none' }} onChange={handleFile} disabled={uploading}
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.xlsx,.txt" />
+        </label>
+      </div>
+
+      {docs.length === 0 ? (
+        <div style={{
+          border:'2px dashed var(--border)', borderRadius:12, padding:'32px 20px',
+          textAlign:'center', color:'var(--text-muted)',
+        }}>
+          <div style={{ fontSize:40, marginBottom:10 }}>📎</div>
+          <p style={{ fontSize:14 }}>אין מסמכים עדיין</p>
+          <p style={{ fontSize:12, marginTop:4 }}>העלה כרטיסי טיסה, ביטוח, אישורי הזמנה...</p>
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {docs.map(doc => (
+            <div key={doc.id} style={{
+              display:'flex', alignItems:'center', gap:12,
+              background:'var(--surface2)', borderRadius:10, padding:'10px 14px',
+              border:'1px solid var(--border)',
+            }}>
+              <span style={{ fontSize:24, flexShrink:0 }}>{fileIcon(doc.mime_type)}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontWeight:600, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {doc.filename}
+                </div>
+                <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:2 }}>
+                  {fmtSize(doc.size)}
+                </div>
+              </div>
+              <button onClick={() => download(doc)} disabled={downloading === doc.id}
+                style={{
+                  background:'rgba(37,99,235,0.08)', border:'1px solid rgba(37,99,235,0.2)',
+                  borderRadius:7, padding:'6px 12px', color:'var(--accent)',
+                  cursor:'pointer', fontSize:12, fontWeight:700, flexShrink:0,
+                }}>
+                {downloading === doc.id ? '...' : '⬇ הורד'}
+              </button>
+              <button onClick={() => confirm('למחוק?') && onDelete(doc, vacation.id)}
+                style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', fontSize:16, flexShrink:0 }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
 // Vacation Card (expandable)
 // ─────────────────────────────────────────────────────────────
-function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCheck, onAddCheck, onDeleteCheck }) {
+function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCheck, onAddCheck, onDeleteCheck, onUploadDoc, onDeleteDoc, onGetDocUrl }) {
   const [expanded, setExpanded] = useState(false)
-  const [tab, setTab]           = useState('schedule') // schedule | flight | car | checklist
+  const [tab, setTab]           = useState('schedule')
 
   const status = vacationStatus(vacation)
   const nights = differenceInDays(new Date(vacation.end_date), new Date(vacation.start_date))
@@ -475,12 +678,17 @@ function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCh
   return (
     <div className="card fade-up" style={{ overflow:'hidden', marginBottom:16 }}>
       {/* Photo header */}
-      <div style={{
-        height: 180, position:'relative', overflow:'hidden',
-        background: 'linear-gradient(135deg, #1e3a5f, #0f1117)',
-        cursor:'pointer',
-      }} onClick={() => setExpanded(e=>!e)}>
-        {vacation.photo_url && (
+      {(() => {
+        const isGradient = vacation.photo_url?.startsWith('GRADIENT:')
+        const gradientBg = isGradient ? vacation.photo_url.split(':')[1] + ':' + vacation.photo_url.split(':')[2] : null
+        const realGradient = isGradient ? vacation.photo_url.replace('GRADIENT:','').split(':').slice(0,-1).join(':') : null
+        return (
+        <div style={{
+          height: 180, position:'relative', overflow:'hidden',
+          background: realGradient || 'linear-gradient(135deg,#1e3a5f,#0f1117)',
+          cursor:'pointer',
+        }} onClick={() => setExpanded(e=>!e)}>
+        {vacation.photo_url && !isGradient && (
           <img src={vacation.photo_url} alt={vacation.destination}
             style={{ width:'100%', height:'100%', objectFit:'cover', opacity:0.85 }}
             onError={e => e.target.style.display='none'} />
@@ -519,22 +727,71 @@ function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCh
         {/* Expand arrow */}
         <div style={{ position:'absolute', bottom:14, left:14, color:'rgba(255,255,255,0.7)', fontSize:20, transform: expanded?'rotate(180deg)':'rotate(0)', transition:'transform 0.25s' }}>▾</div>
       </div>
+        )
+      })()}
+
+      {/* Flight info bar — מוצג תמיד אם יש טיסה */}
+      {(vacation.flight_out || vacation.flight_back || vacation.airline) && (
+        <div style={{
+          background:'rgba(37,99,235,0.04)', borderBottom:'1px solid var(--border)',
+          padding:'12px 18px', display:'flex', flexWrap:'wrap', gap:16, alignItems:'center',
+        }}>
+          {vacation.airline && (
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontSize:16 }}>✈️</span>
+              <span style={{ fontWeight:800, fontSize:15 }}>{vacation.airline}</span>
+            </div>
+          )}
+          {vacation.flight_out && (
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>🛫 יציאה</span>
+              <span style={{
+                fontFamily:'monospace', fontWeight:700, fontSize:14,
+                background:'rgba(37,99,235,0.1)', color:'var(--accent)',
+                borderRadius:6, padding:'2px 8px',
+              }}>{vacation.flight_out}</span>
+            </div>
+          )}
+          {vacation.flight_back && (
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>🛬 חזרה</span>
+              <span style={{
+                fontFamily:'monospace', fontWeight:700, fontSize:14,
+                background:'rgba(16,185,129,0.1)', color:'var(--green)',
+                borderRadius:6, padding:'2px 8px',
+              }}>{vacation.flight_back}</span>
+            </div>
+          )}
+          {vacation.has_car && (
+            <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+              <span style={{ fontSize:14 }}>🚗</span>
+              <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:600 }}>
+                {vacation.car_company || 'רכב שכור'}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Quick stats bar */}
       <div style={{ display:'flex', borderBottom:'1px solid var(--border)' }}>
         {checkTotal > 0 && (
-          <div style={{ flex:1, padding:'10px 16px', borderLeft:'1px solid var(--border)' }}>
-            <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>צ'קליסט</div>
-            <div style={{ fontWeight:800, fontSize:15 }}>{checkDone}/{checkTotal}</div>
+          <div style={{ flex:1, padding:'10px 14px', borderLeft:'1px solid var(--border)' }}>
+            <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>צ'קליסט</div>
+            <div style={{ fontWeight:800, fontSize:14 }}>{checkDone}/{checkTotal}</div>
           </div>
         )}
-        <div style={{ flex:1, padding:'10px 16px', borderLeft:'1px solid var(--border)' }}>
-          <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>ימי לוז</div>
-          <div style={{ fontWeight:800, fontSize:15 }}>{(vacation.vacation_schedule||[]).length}</div>
+        <div style={{ flex:1, padding:'10px 14px', borderLeft:'1px solid var(--border)' }}>
+          <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>מסמכים</div>
+          <div style={{ fontWeight:800, fontSize:14 }}>{(vacation.vacation_documents||[]).length}</div>
         </div>
-        <div style={{ flex:1, padding:'10px 16px' }}>
-          <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>לילות</div>
-          <div style={{ fontWeight:800, fontSize:15 }}>{nights}</div>
+        <div style={{ flex:1, padding:'10px 14px', borderLeft:'1px solid var(--border)' }}>
+          <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>ימי לוז</div>
+          <div style={{ fontWeight:800, fontSize:14 }}>{(vacation.vacation_schedule||[]).length}</div>
+        </div>
+        <div style={{ flex:1, padding:'10px 14px' }}>
+          <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600, marginBottom:3 }}>לילות</div>
+          <div style={{ fontWeight:800, fontSize:14 }}>{nights}</div>
         </div>
       </div>
 
@@ -546,6 +803,7 @@ function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCh
             {[
               ['schedule','📅 לוח שנה'],
               ['checklist',`✅ צ'קליסט`],
+              ['docs','📎 מסמכים'],
               ['flight','🛫 טיסה'],
               ['car','🚗 רכב'],
               ['notes','📝 הערות'],
@@ -576,6 +834,15 @@ function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCh
                 onToggle={onToggleCheck}
                 onAdd={onAddCheck}
                 onDelete={onDeleteCheck}
+              />
+            )}
+
+            {tab === 'docs' && (
+              <VacationDocuments
+                vacation={vacation}
+                onUpload={onUploadDoc}
+                onDelete={onDeleteDoc}
+                onGetUrl={onGetDocUrl}
               />
             )}
 
@@ -651,7 +918,7 @@ function VacationCard({ vacation, onEdit, onDelete, onUpdateSchedule, onToggleCh
 // Main App
 // ─────────────────────────────────────────────────────────────
 export default function VacationsApp({ activePage, onPageChange }) {
-  const { vacations, loading, add, update, remove, updateScheduleDay, toggleCheckItem, addCheckItem, deleteCheckItem } = useVacations()
+  const { vacations, loading, add, update, remove, updateScheduleDay, toggleCheckItem, addCheckItem, deleteCheckItem, uploadDocument, deleteDocument, getDocumentUrl } = useVacations()
   const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState(null)
   const [filter, setFilter]   = useState('all') // all | upcoming | past
@@ -737,6 +1004,9 @@ export default function VacationsApp({ activePage, onPageChange }) {
           onToggleCheck={toggleCheckItem}
           onAddCheck={addCheckItem}
           onDeleteCheck={deleteCheckItem}
+          onUploadDoc={uploadDocument}
+          onDeleteDoc={deleteDocument}
+          onGetDocUrl={getDocumentUrl}
         />
       ))}
 

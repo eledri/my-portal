@@ -296,6 +296,7 @@ CREATE TABLE vacation_schedule (
   day_date DATE NOT NULL,
   day_number INTEGER NOT NULL,
   title TEXT DEFAULT '',
+  location TEXT DEFAULT '',
   activities TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -316,3 +317,24 @@ ALTER TABLE vacation_checklist ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "vacations_own"          ON vacations          FOR ALL USING (user_id = auth.uid());
 CREATE POLICY "vacation_schedule_own"  ON vacation_schedule  FOR ALL USING (user_id = auth.uid());
 CREATE POLICY "vacation_checklist_own" ON vacation_checklist FOR ALL USING (user_id = auth.uid());
+
+-- vacation documents
+CREATE TABLE vacation_documents (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  vacation_id UUID REFERENCES vacations(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
+  size INTEGER,
+  mime_type TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE vacation_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "vacation_documents_own" ON vacation_documents FOR ALL USING (user_id = auth.uid());
+
+-- vacation-docs storage bucket (הרץ בנפרד אם צריך)
+INSERT INTO storage.buckets (id, name, public) VALUES ('vacation-docs', 'vacation-docs', false) ON CONFLICT DO NOTHING;
+CREATE POLICY "vacation docs upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'vacation-docs' AND auth.uid()::text = (string_to_array(name, '/'))[1]);
+CREATE POLICY "vacation docs select" ON storage.objects FOR SELECT USING (bucket_id = 'vacation-docs' AND auth.uid()::text = (string_to_array(name, '/'))[1]);
+CREATE POLICY "vacation docs delete" ON storage.objects FOR DELETE USING (bucket_id = 'vacation-docs' AND auth.uid()::text = (string_to_array(name, '/'))[1]);
